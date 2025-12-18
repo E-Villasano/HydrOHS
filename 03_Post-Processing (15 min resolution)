@@ -187,7 +187,6 @@ ggplot() +
   #ylim(0,200) +
   theme_classic()
 
-## Convert to interactive
 #p0_interactive <- ggplotly(p0)
 #p0_interactive
 
@@ -204,7 +203,6 @@ ggplot() +
   #ylim(0,500) +
   theme_classic()
 
-## Convert to interactive
 #p1_interactive <- ggplotly(p1)
 #p1_interactive
 
@@ -219,7 +217,6 @@ ggplot() +
   ylim(-1.0, 1.0) +
   theme_classic()
 
-## Convert to interactive
 #p2_interactive <- ggplotly(p2)
 #p2_interactive
 
@@ -240,7 +237,6 @@ ggplot(cali, aes(x = SC, y = SCq)) +
            hjust = 1.1, vjust = -1.5, size = 4, fontface = "bold") +
   theme_classic()
 
-## Convert to interactive
 p3_interactive <- ggplotly(p3)
 p3_interactive
 ggsave("p10_plot.png", plot = p10, width = 9, height = 4, dpi = 300)
@@ -257,13 +253,12 @@ ggplot() +
   #ylim(-1.0, 1.0) +
   theme_classic()
 
-## Convert to interactive
 #p4_interactive <- ggplotly(p4)
 #p4_interactive
 
 ################################################################################
 ggplot() +
-  #p8 <- ggplot() +
+  #p5 <- ggplot() +
   geom_line(data = dfl_filt, aes(x = dfl_filt$time, y = SC), color = "grey", alpha = 1, linewidth = 1)+
   geom_point(data = dflp, aes(x = dflp$time, y = SC), color = "red", alpha = 1)+
   #geom_vline(xintercept = SCqfp$i, color = "black", linetype = "dashed", linewidth = 0.3)+
@@ -274,167 +269,5 @@ ggplot() +
   #ylim(0,500) +
   theme_classic()
 
-## Convert to interactive
-#p8_interactive <- ggplotly(p8)
-#p8_interactive
-
-
-print(f1)
-print(f2)
-print(f3)
-print(f4)
-
-################################################################################
-### Poster Plots with Datetime ###
-################################################################################
-##SC Plots
-# Drop xts class just in case
-dfl_filt_clean <- dfl_filt %>%
-  mutate(across(c(SC, SCb, SCy), as.numeric)) %>%  # Force numeric
-  mutate(time = index(dfl_filt))                   # Add time index for plotting
-# Reshape to long format for ggplot legend support
-dfl_long <- dfl_filt_clean %>%
-  pivot_longer(cols = c(SC, SCb, SCy), names_to = "Type", values_to = "Value")
-
-# Plot
-p8 <- ggplot(dfl_long, aes(x = time, y = Value, color = Type)) +
-  geom_line(alpha = 1, linewidth = 0.7) +
-  scale_color_manual(values = c("SC" = "grey", "SCb" = "blue", "SCy" = "red")) +
-  labs(
-    x = "Time (15 min interval)",
-    y = "SC (µS/cm)",
-    title = "Cholollo Campground 15 - Time vs SC",
-    color = "Line Type"
-  ) +
-  theme_classic()+
-  theme(
-    axis.title = element_text(size = 18, face = "bold"),
-    axis.text = element_text(size = 14, face = "bold"),
-    plot.title = element_text(size = 20, face = "bold"),
-    legend.title = element_text(size = 16, face = "bold"),
-    legend.text = element_text(size = 14, face = "bold")
-  )
-
-# Convert to interactive plot
-p8_interactive <- ggplotly(p8)
-p8_interactive
-ggsave("p8_plot.png", plot = p8, width = 9, height = 4, dpi = 300)
-
-################################################################################
-library(htmlwidgets)
-library(webshot2)
-
-##SC v SCq Plots
-rmse_val <- Metrics::rmse(cali$SC, cali$SCq)
-percent_error <- mean(abs((cali$SC - cali$SCq) / cali$SC)) * 100
-
-p10 <- ggplot(cali, aes(x = SC, y = SCq)) +  
-  geom_point(shape = 18, color = "grey") +
-  geom_smooth(method = "lm") +
-  labs(
-    x = "Measured SC (µS/cm)", 
-    y = "Modeled SC (µS/cm)",
-    title = "Cholollo Campground 15"
-  ) +
-  theme_classic() +
-  theme(
-    axis.title = element_text(size = 18, face = "bold"),
-    axis.text = element_text(size = 14, face = "bold"),
-    plot.title = element_text(size = 20, face = "bold")
-  )
-
-## Convert to interactive
-p10_interactive <- ggplotly(p10, width = 900, height = 400)
-
-p10_interactive <- p10_interactive %>%
-  layout(
-    annotations = list(
-      list(
-        x = 1.00,
-        y = 0.05,
-        xref = "paper",
-        yref = "paper",
-        text = paste0(
-          "RMSE = ", round(rmse_val, 2), "<br>",
-          "Percent Error = ", round(percent_error, 2), "%<br>",
-          "x<sub>2</sub> = ", round(x2, 3)
-        ),
-        showarrow = FALSE,
-        font = list(size = 20, family = "Arial Black", color = "black"),
-        align = "left"
-      )
-    )
-  )
-
-# Show plot
-p10_interactive
-# Save as HTML
-htmlwidgets::saveWidget(p10_interactive, "p10_plot.html", selfcontained = TRUE)
-
-# Save as PNG using webshot2 (no Python required)
-# Capture screenshot with matching viewport size
-webshot2::webshot(
-  "p10_plot.html",
-  file = "p10_plot.png",
-  vwidth = 900,    # same as plotly width
-  vheight = 400,   # same as plotly height
-  zoom = 3         # zoom multiplies resolution (3*900=2700 px wide)
-)
-################################################################################
-################################################################################
-library(ggplot2)
-library(plotly)
-library(dplyr)
-library(tidyr)
-
-# ---- A) Prepare data ----
-dfl_filt_clean <- dfl_filt %>%
-  mutate(across(c(SC, SCb, SCy), as.numeric)) %>%  # ensure numeric
-  mutate(time = index(dfl_filt))                   # numeric index for plotting
-
-# Reshape to long format for legend support
-dfl_long <- dfl_filt_clean %>%
-  pivot_longer(cols = c(SC, SCb, SCy),
-               names_to = "Type",
-               values_to = "Value")
-
-# Extract datetime vector
-dt_vals <- dfl_filt$datetime  # POSIXct
-
-# ---- B) Determine exact year-start tick marks ----
-tick_years <- c(2009, 2014, 2019, 2024)  # adjust years as needed
-# Select datetimes exactly at midnight of Jan 1 for each tick year
-tick_dates <- dt_vals[format(dt_vals, "%Y-%m-%d %H:%M:%S") %in%
-                        paste0(tick_years, "-01-01 00:00:00")]
-# Get row indices for those datetimes
-brks <- which(dt_vals %in% tick_dates)
-
-# ---- C) Build the plot ----
-p53 <- ggplot(dfl_long, aes(x = time, y = Value, color = Type)) +
-  geom_line(alpha = 1, linewidth = 0.5) +  # thinner lines for high-res data
-  scale_color_manual(values = c("SC" = "grey", "SCb" = "blue", "SCy" = "red")) +
-  labs(
-    x = "Time (15 min interval)",
-    y = "SC (µS/cm)",
-    title = "Cholollo Campground 15 - Time vs SC",
-    color = "Line Type"
-  ) +
-  scale_x_continuous(
-    breaks = brks,
-    labels = format(dt_vals[brks], "%Y")  # show only the year
-  ) +
-  theme_classic() +
-  theme(
-    axis.title = element_text(size = 18, face = "bold"),
-    axis.text  = element_text(size = 14, face = "bold"),
-    plot.title = element_text(size = 20, face = "bold"),
-    legend.title = element_text(size = 16, face = "bold"),
-    legend.text  = element_text(size = 14, face = "bold")
-  )
-
-# ---- D) Convert to interactive ----
-p53_interactive <- ggplotly(p53)
-p53_interactive
-
-# ---- E) Save static PNG ----
-ggsave("p53_highres_plot.png", plot = p53, width = 9, height = 4, dpi = 300)
+#p5_interactive <- ggplotly(p5)
+#p5_interactive
