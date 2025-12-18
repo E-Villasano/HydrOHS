@@ -167,7 +167,7 @@ Begin excecution of HydrOHS base function
 
   Create sub-dataframe of just SC_rain
   
-  Determine SCy interpolation type (x3)
+  Determine SCy interpolation type
   
   Remove any remaining na's in streamflow
   
@@ -176,7 +176,7 @@ Begin excecution of HydrOHS base function
   
   Create dfl
   
-  Define Recession Constant and BFImax values (x1 & x2)
+  Define Recession Constant and BFImax values
 
   Create empty b vector
   
@@ -350,6 +350,137 @@ export as csv
 #Save the TOPSIS solution's decision variables, corresponding objective function evaluation, & datasets used in the Pareto plot generation
 
 
+################################################################################
+
+Post-Processing:
+
+################################################################################
+
+# Load in TOPSIS Solution Decision variables for x1-x11
+
+Note: Entirely of the function in Post-Processing is identical to the function in Processing with the exception of the TOPSIS decision variable implementation. Jump down to Post-Processing
+Plotting overview to avoid repetition.
+
+
+Begin excecution of HydrOHS base function with TOPSIS output implemented
+
+  ################################################################################
+  ### Step 4 : Compute SCy from smoothed SC_rain
+
+  Create sub-dataframe of just SC_rain
+  
+  Determine SCy interpolation type
+  
+  Remove any remaining na's in streamflow
+  
+  ################################################################################
+  ### Step 5 : Apply Eckhardt RDF and calculate bf and qf
+  
+  Create dfl
+  
+  Define Recession Constant and BFImax values
+
+  Create empty b vector
+  
+  fill in initial value of b
+
+  iterate through remaining values
+  
+  assign b
+  
+  calculate y
+  
+  calculate bfi
+  
+  #Assigns 0 streamflow days a negative bfi for later removal
+  
+  round bfi to six digits (mitigates potential error in later peak identification)
+
+  ################################################################################
+  ### Step 6 : Tune SCy
+  
+  Omit na's present in ts and dfl via the warmup and cooldown periods after Eckhardt application
+  
+  Amplify, smooth and offset SC_rain
+  
+  Convert ts to xts object
+
+  ################################################################################
+  ### Step 7 : set SCy lag ON XTS DATA!!!
+  
+  Append SCy column
+  
+  Omit NAs in dfl
+
+  ################################################################################
+  ### Step 8 : Filter out non-perennial days & re-index
+  
+  Filter out non-perennial days
+  
+  Re-index (create artificial, truncated ts only for comparison of SC and BFI trends) & rename dataframe (dfl to dfl_filt)
+  
+  ################################################################################
+  ### Step 9 : Get bfi peaks based on peak height (ph) and peak length (pl) adjustable variables
+  
+  Identify minpeakheight & minpeakdistance valyes (rounded to mitigate findpeak point difference errors)
+  
+  Identify bfi peaks
+  
+  Subset dfl at BFI peak indices
+  
+  ################################################################################
+  ### Step 10 : Get SCb for peaks
+  
+  Populate SCb sub-dataframe with reference to dflp values
+  
+  Relabel columns in SCb
+  
+  Check for negative indices in SCb & set to 0 as needed
+
+  Apply SCb to dflp as the SCb column
+
+  
+  ################################################################################
+  ### Step 11 : Interpolate for entire SCb
+
+  Using peaks identified in dflp/SCb for reference, interpolate SCb for the remaining rows
+
+  Remove any remaining NA's 
+  
+  ################################################################################
+  ### Step 12 : Chemical Mass Balance
+  
+  Chemical mass balance: Use the estimated SCb, b, SCy & y in conjunction with measured Q to calculate final SCq (modeled streamflow SC) estimations
+  
+  ################################################################################
+  ### Step 13 : Extract calibration data and merge
+
+  #Use finalized dataframe to generate a calibration dataframe (cali)
+
+  ################################################################################
+  ### Step 14 : Assign mass balance indicators
+
+  ################################################################################
+  ### Step 14A : Apply heteroscedasticity penalty 
+  
+  Compute residuals
+  
+  ################################################################################
+  ### Step 15 : Objective functions
+
+  Apply safeguard conditions
+
+  Assign a High error penalty if safeguard conditions are violated in attempt to satisfy the four objective functions
+
+  Establish objective functions:
+ 
+  F1: RMSE between measured and modeled SC
+    
+  F2 &F3: Mass balance indicators (sign agreement)
+
+  F4: BFImax value must correlate with maximum SCb value in dflp
+
+End of HydrOHS base function
 
 
 
@@ -360,10 +491,3 @@ export as csv
 
 
 
-
-
-
-
-
-
-\
