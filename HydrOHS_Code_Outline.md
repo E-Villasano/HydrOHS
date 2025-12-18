@@ -495,7 +495,7 @@ Plot 4: Measured SC vs Modeled SC Estimations
 
 Plot 5: Time vs dflp BFI peaks
 
-Plot 6: TIme vs dflp SC peaks
+Plot 6: Time vs dflp SC peaks
 
 
 
