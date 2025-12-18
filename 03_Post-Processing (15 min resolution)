@@ -64,11 +64,10 @@ dfl$b = b
 
 dfl$y = dfl$strflow - b
 
-#dfl = round(dfl,digits=4)
-
 dfl$bfi <- ifelse(dfl$strflow == 0, -1, dfl$b/dfl$strflow)  
 
 dfl$bfi <- round(dfl$bfi, digits = 6)   
+
 ################################################################################
 ts_int = na.omit(ts_int) 
 dfl = na.omit(dfl)
@@ -82,42 +81,34 @@ if ((x4) == 0) {
 }
 
 ts <- xts(ts_int[, -1], order.by = ts_int$datetime)
+
 ################################################################################
 lag = round(x7, digits = 0)
 SCy_lag = (stats::lag(ts$SCy,-lag))
 
 dfl$SCy = SCy_lag
-#str(dfl$SCy)
 colnames(dfl)[8] <- "SCy"
 
 dfl = na.omit(dfl)
 
 ################################################################################
-### Step 8 : Filter out non-perennial days
 dfl_filt = dfl[dfl$bfi > -1, ]
 
-## re-index (create artificial, truncated ts only for comparison of Sc and BFI trends)
 rownames(dfl_filt) <- 1:nrow(dfl_filt)
 dfl_filt$time = 1:nrow(dfl_filt)
 
 ################################################################################
-### Step 9 : Get bfi peaks based on peak height (ph) and peak length (pl) adjustable variables
 
 ph = round(x8, digits = 0)
 pl = round(x9, digits = 0)
 
-# identify bfi peaks
 peaks_bfi <- pracma::findpeaks(dfl_filt$bfi, minpeakheight = ph, minpeakdistance = pl)
 ps <- if (!is.null(peaks_bfi)) as.data.frame(peaks_bfi)$V2 else numeric(0)
 if (length(ps) > 1) ps <- sort(ps)
 
-# Subset dfl at BFI peak indices
 dflp <- if (length(ps) > 0) dfl_filt[ps, ] else dfl_filt[0, ]
 
-
 ################################################################################
-### Step 10 : Get SCb for peaks
-
 if (nrow(dflp)>3)  {
   SCb = as.data.frame(((dflp$SC*dflp$strflow)-(dflp$SCy*dflp$y))/
                         dflp$b)
@@ -127,16 +118,12 @@ if (nrow(dflp)>3)  {
   SCb = dfl[1:3,cbind(2, 4)]
 }
 
-#Relabel columns in SCb
 colnames(SCb) <- c('SCb', 'i')
 
-# check for negative indices
 SCb$SCb <- ifelse(SCb$SCb <0, 0, SCb$SCb)
-# merge SCb with dflp
 dflp$SCb=SCb$SCb
 
 ################################################################################
-### Step 11 : Interpolate for entire SCb
 if (round(x10, digits = 0) == 1) {
   dfl_filt$SCb = signal::interp1(SCb$i, SCb$SCb, dfl_filt$time, "pchip", extrap = NA)
 } else if (round(x10, digits = 0) == 2) {  
@@ -146,69 +133,54 @@ if (round(x10, digits = 0) == 1) {
 } else { 
   dfl_filt$SCb = signal::interp1(SCb$i, SCb$SCb, dfl_filt$time, "cubic", extrap = NA)
 } 
-#dfl_filt$SCb <- ifelse(dfl_filt$SCb <0, 0, dfl_filt$SCb)
+
 dfl_filt = na.omit(dfl_filt)
 
 ################################################################################
-### Step 12 : Chemical Mass Balance
-# Chemical mass balance
 dfl_filt$SCq = as.numeric((dfl_filt$SCb * dfl_filt$b + dfl_filt$SCy * dfl_filt$y)/dfl_filt$strflow)
 dfl_filt <- dfl_filt[!is.na(dfl_filt$SCb), ]
 
 ################################################################################
-### Step 13 : Extract calibration data and merge
-#cali = dfl_filt[dfl_filt$bfi<1, ]
 cali = dfl_filt[!(dfl_filt$time %in% dflp$time), ]
+
 ################################################################################
-### Step 14 : Assign mass balance indicators
 cali$ind1 = ifelse(cali$SC>cali$SCb,1,0)
 cali$ind2 = ifelse(cali$SC<cali$SCb,1,0)
 cali$ind3 = ifelse(cali$SCy>cali$SC,1,0)
 cali$ind4 = ifelse(cali$SCy<cali$SC,1,0)
 
 ################################################################################
-### Step 14A : Apply heteroscedasticity penalty 
-## compute residuals
 resid <- cali$SC - cali$SCq
 pen <- ineq(abs(resid), type = "Gini")
+
 ################################################################################
-################################################################################
-################################################################################
-### Step 15 : Objective functions
 f <- numeric(4) 
-# Apply safeguard conditions
 if (x2 ==0 || x2 ==1 || min(ts_int$SC_rain) <=0 || min(ts_int$SCy) <=0 || min(dfl_filt$SCb) <=0 ||(x11 - dflp$bfi[which.max(dflp$SCb)]) > 0) {
-  f1 = 1e12  # High error penalty
+  f1 = 1e12 
   f2 = 1e12
   f3 = 1e12
   f4 = 1e12
 } else {
-  # RMSE between measured and modeled SC
+
   f1 = try(Metrics::mae(cali$SC, cali$SCq)*(1+pen), silent = TRUE)
-  
-  # Mass balance indicators (sign agreement)
-  f2 = as.numeric(sum(cali$ind1) - sum(cali$ind2))  # SC > SCb vs SC < SCb
-  f3 = as.numeric(sum(cali$ind3) - sum(cali$ind4))  # SCy > SC vs SCy < SC
+  f2 = as.numeric(sum(cali$ind1) - sum(cali$ind2)) 
+  f3 = as.numeric(sum(cali$ind3) - sum(cali$ind4))  
   f4 = 1-x11
   
 }
 
-
-## export as csv
 write.csv(as.data.frame(dfl),"dfl.csv")
 
 ################################################################################
-################################################################################
-################################################################################
+
 ## Plots
 
 ################################################################################
 ggplot() +
-  #p7 <- ggplot() +
+  #p0 <- ggplot() +
   geom_line(data = dfl_filt, aes(x = index(dfl_filt), y = strflow), color = "grey", alpha = 1, linewidth = 1)+
   geom_line(data = dfl_filt, aes(x = index(dfl_filt), y = b), color = "blue", alpha = 1, linewidth = 0.5)+
   geom_line(data = dfl_filt, aes(x = index(dfl_filt), y = y), color = "red", alpha = 1, linewidth = 0.5)+
-  #geom_vline(xintercept = SCqfp$i, color = "black", linetype = "dashed", linewidth = 0.3)+
   labs(x = "Time",
        y = "Flow (ft3/d)")+
   #xlim(0, 200) +
@@ -216,67 +188,47 @@ ggplot() +
   theme_classic()
 
 ## Convert to interactive
-#p7_interactive <- ggplotly(p7)
-#p7_interactive
+#p0_interactive <- ggplotly(p0)
+#p0_interactive
 
 ################################################################################
 ggplot() +
-  #p8 <- ggplot() +
+  #p1 <- ggplot() +
   geom_line(data = dfl_filt, aes(x = index(dfl_filt), y = SC), color = "grey", alpha = 1, linewidth = 1)+
   geom_line(data = dfl_filt, aes(x = index(dfl_filt), y = SCb), color = "blue", alpha = 1, linewidth = 0.5)+
   geom_line(data = dfl_filt, aes(x = index(dfl_filt), y = SCy), color = "red", alpha = 1, linewidth = 0.5)+
-  #geom_line(data = dfl, aes(x = index(dfl), y = SCq), color = "purple", alpha = 1, linewidth = 0.5)+
-  #geom_vline(xintercept = SCqfp$i, color = "black", linetype = "dashed", linewidth = 0.3)+
   labs(x = "Time (days)",
        y = "SC (µS/cm)",
        title = "Cholollo Campground-15 Time vs SC")+
-  #xlim(3000, 7000) +
+  #xlim(0, 7000) +
   #ylim(0,500) +
   theme_classic()
 
-################################################################################
+## Convert to interactive
+#p1_interactive <- ggplotly(p1)
+#p1_interactive
 
+################################################################################
 ggplot() +
-  #p23 <- ggplot() +
+  #p2 <- ggplot() +
   geom_line(data = dfl, aes(x = index(dfl), y = bfi), color = "grey", alpha = 1, linewidth = 1)+
   labs(x = "Time (days)",
        y = "BFI",
        title = "Cholollo Campground-15 Time vs SC")+
-  #xlim(3000, 7000) +
-  ylim(-1.0, 0.0) +
+  #xlim(0, 7000) +
+  ylim(-1.0, 1.0) +
   theme_classic()
 
-################################################################################
-# Drop xts class just in case
-dfl_filt_clean <- dfl_filt %>%
-  mutate(across(c(SC, SCb, SCy), as.numeric)) %>%  # Force numeric
-  mutate(time = index(dfl_filt))                   # Add time index for plotting
-# Reshape to long format for ggplot legend support
-dfl_long <- dfl_filt_clean %>%
-  pivot_longer(cols = c(SC, SCb, SCy), names_to = "Type", values_to = "Value")
+## Convert to interactive
+#p2_interactive <- ggplotly(p2)
+#p2_interactive
 
-# Plot
-p8 <- ggplot(dfl_long, aes(x = time, y = Value, color = Type)) +
-  geom_line(alpha = 1, linewidth = 0.7) +
-  scale_color_manual(values = c("SC" = "grey", "SCb" = "blue", "SCy" = "red")) +
-  labs(
-    x = "Time (days)",
-    y = "SC (µS/cm)",
-    title = "Cholollo Campground 15 - Time vs SC",
-    color = "Line Type"
-  ) +
-  theme_classic()
-
-# Convert to interactive plot
-p8_interactive <- ggplotly(p8)
-p8_interactive
-ggsave("p8_plot.png", plot = p8, width = 9, height = 4, dpi = 300)
 ################################################################################
 rmse_val <- Metrics::rmse(cali$SC, cali$SCq)
 percent_error <- mean(abs((cali$SC - cali$SCq) / cali$SC)) * 100
 
 ggplot(cali, aes(x = SC, y = SCq)) +  
-#p10 <- ggplot(cali, aes(x = SC, y = SCq)) +  
+#p3 <- ggplot(cali, aes(x = SC, y = SCq)) +  
   geom_point(shape = 18, color = "grey") +
   geom_smooth(method = "lm") +
   labs(x = "Measured SC (µS/cm)", 
@@ -289,29 +241,27 @@ ggplot(cali, aes(x = SC, y = SCq)) +
   theme_classic()
 
 ## Convert to interactive
-p10_interactive <- ggplotly(p10)
-p10_interactive
+p3_interactive <- ggplotly(p3)
+p3_interactive
 ggsave("p10_plot.png", plot = p10, width = 9, height = 4, dpi = 300)
-## Convert to interactive
-#p10_interactive <- ggplotly(p10)
-#p10_interactive
 
+################################################################################
 ggplot() +
-  #p8 <- ggplot() +
+  #p4 <- ggplot() +
   geom_line(data = dfl_filt, aes(x = dfl_filt$time, y = bfi), color = "grey", alpha = 1, linewidth = 1)+
   geom_point(data = dflp, aes(x = dflp$time, y = bfi), color = "red", alpha = 1)+
-  #geom_vline(xintercept = SCqfp$i, color = "black", linetype = "dashed", linewidth = 0.3)+
   labs(x = "Time (days)",
        y = "bfi",
        title = "Cholollo Campground-15 bfi peaks - bfi")+
   #xlim(3000, 7000) +
-  #ylim(0,500) +
+  #ylim(-1.0, 1.0) +
   theme_classic()
 
 ## Convert to interactive
-#p8_interactive <- ggplotly(p8)
-#p8_interactive
+#p4_interactive <- ggplotly(p4)
+#p4_interactive
 
+################################################################################
 ggplot() +
   #p8 <- ggplot() +
   geom_line(data = dfl_filt, aes(x = dfl_filt$time, y = SC), color = "grey", alpha = 1, linewidth = 1)+
