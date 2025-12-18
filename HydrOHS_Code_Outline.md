@@ -480,10 +480,22 @@ Begin excecution of HydrOHS base function with TOPSIS output implemented
 
 End of HydrOHS base function
 
+################################################################################
+Plotting:
 
+Note: All plots made available via ggplot & plotly for varying resolution needs
 
+Plot 1: Time vs streamflow, baseflow, & quickflow (ft3/d)
 
+Plot 2: Time vs SC, SCb, & SCy (µS/cm)
 
+Plot 3: Time vs BFI
+
+Plot 4: Measured SC vs Modeled SC Estimations
+
+Plot 5: Time vs dflp BFI peaks
+
+Plot 6: TIme vs dflp SC peaks
 
 
 
