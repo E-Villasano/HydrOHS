@@ -10,11 +10,11 @@ Formatting of the initial streamflow, SC (specific conductance), and Precipitati
 
 Structure:
 
-Pre-Processing
+ - Pre-Processing
 
-Processing
+ - Processing
 
-Post-Processing
+ - Post-Processing
 
 
 Input Data Requirements:
