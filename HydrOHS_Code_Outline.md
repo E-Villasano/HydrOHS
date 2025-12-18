@@ -358,9 +358,7 @@ Post-Processing:
 
 # Load in TOPSIS Solution Decision variables for x1-x11
 
-Note: Entirely of the function in Post-Processing is identical to the function in Processing with the exception of the TOPSIS decision variable implementation. Jump down to Post-Processing
-Plotting overview to avoid repetition.
-
+Note: Nearly the entire function in Post-Processing is identical to the function in Processing with the exception of the TOPSIS decision variable implementation. Jump down to Post-Processing plotting section to avoid repetition.
 
 Begin excecution of HydrOHS base function with TOPSIS output implemented
 
