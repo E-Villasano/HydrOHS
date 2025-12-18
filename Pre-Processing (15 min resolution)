@@ -230,4 +230,4 @@ ts_int$SC = signal::interp1(SC$time, SC$SC, ts_int$time, "pchip", extrap = NA)
 ts_int$SC <- ifelse(ts_int$SC < 0, 0, ts_int$SC)
 
 ################################################################################
-rm(list = setdiff(ls(), c("ts", "dfa", "ts_int")))   #Pre-Processing Clearing
+rm(list = setdiff(ls(), c("ts", "dfa", "ts_int")))  
