@@ -1,0 +1,233 @@
+pacman::p_load(pracma, ecr, KernSmooth, tictoc, SparseM, topsis, plotly, reshape2, cdata, tidyverse, mco, nsga2R, gsignal, spacetime, zoo, xts, SparseM, fANCOVA, signal, foreach, doParallel, grwat, adc, hydroGOF, parallel, doParallel, hydrostats, hydroEvents, tidyr, spatialEco, zoo, npreg, fANCOVA, forecast, FlowScreen, stinepack, imputeTS, missForest, Metrics, dplyr, tstools, tsbox, highfrequency, tidyverse, install = T)
+library(dplyr)
+library(plotly)
+library(lubridate)
+library(zoo)
+library(ggplot2)
+library(gridExtra)
+library(scales)
+library(imputeTS)
+library(fANCOVA)
+library(xts)
+
+################################################################################
+df_SC = read.csv("df_SC.csv",header=TRUE)
+df_WL = read.csv("df_WL.csv",header=TRUE)
+
+MTN <- as.data.frame(read.csv("NTN-ca75-w-s-mg.csv"))
+MTN$volwt = MTN$Conduc*MTN$subppt/(mean(MTN$subppt))
+
+MTN = MTN[c(5,8)]
+MTN = MTN[22:276,]
+
+################################################################################
+start_time <- as.POSIXct("2007-11-23 00:00")
+end_time <- as.POSIXct("2024-08-03 23:45")  
+
+datetime_seq <- seq(from = start_time, to = end_time, by = "15 min")
+df_dt <- data.frame(Timestamp = datetime_seq)
+colnames(df_dt)[colnames(df_dt) == "Timestamp"] <- "datetime" 
+
+df_dt <- df_dt %>%
+  dplyr::mutate(
+    datetime = lubridate::force_tz(datetime, tzone = "America/Los_Angeles"),
+    dst = lubridate::dst(datetime),
+    timezone = ifelse(dst, "PDT", "PST")
+  )
+
+df_dt <- df_dt[,-2]
+df <- df_dt
+
+################################################################################
+SC_dt = as.POSIXct(df_SC$date, format = "%m/%d/%Y %H:%M")
+data_SC = cbind(SC_dt, df_SC[c(2:3)]) 
+colnames(data_SC)[colnames(data_SC) == "SC_dt"] <- "datetime" 
+
+WL_dt = as.POSIXct(df_WL$date, format = "%m/%d/%Y %H:%M")
+data_WL = cbind(WL_dt, df_WL[c(2:3)])
+colnames(data_WL)[colnames(data_WL) == "WL_dt"] <- "datetime" 
+
+SC_rain_dt = as.POSIXct(MTN$Date, format = "%m/%d/%Y %H:%M")
+data_SC_rain = cbind(SC_rain_dt, MTN[c(2)])
+colnames(data_SC_rain)[colnames(data_SC_rain) == "SC_rain_dt"] <- "datetime"
+colnames(data_SC_rain)[colnames(data_SC_rain) == "Conduc"] <- "SC_rain"
+
+################################################################################
+df_dt$datetime <- as.character(df_dt$datetime)
+data_WL$datetime <- as.character(data_WL$datetime)
+data_SC$datetime <- as.character(data_SC$datetime)
+data_SC_rain$datetime <- as.character(data_SC_rain$datetime)
+
+str(df_dt)
+str(data_WL)
+str(data_SC)
+str(data_SC_rain)
+
+dfm <- list(df_dt, data_WL, data_SC)
+
+merged_df <- Reduce(function(x, y) {
+  left_join(x, y, by = c("datetime", "timezone"))
+  #full_join(x, y, by = c("datetime", "timezone"))
+}, dfm)
+
+str(merged_df) #still as chr
+str(df) #read as POSIXct
+str(data_SC_rain)
+
+dfr <- list(merged_df, data_SC_rain)
+
+ts <- Reduce(function(x, y) {
+  left_join(x, y, by = c("datetime"))
+  #full_join(x, y, by = c("datetime"))
+}, dfr)
+
+ts = cbind(df, ts[c(3:5)])
+ts <- ts[,-2]
+ts$time = 1:nrow(ts)
+
+ts <- xts(ts[, -1], order.by = ts$datetime)
+
+################################################################################
+sum(is.na(ts$strflow))
+sum(is.na(ts$SC))
+sum(is.na(ts$SC_rain))
+max_value <- max(ts$SC, na.rm = TRUE)
+min_value <- min(ts$SC, na.rm = TRUE)
+
+rm(list = setdiff(ls(), "ts"))
+
+################################################################################
+ts1 = ts[38881:73920,]     #Peak Year 1 (2009) Identification
+ts2 = ts[144001:179136,]   #Peak Year 2 (2012) Identification
+ts3 = ts[284257:319392,]   #Peak Year 3 (2016) Identification
+ts4 = ts[389473:424512,]   #Peak Year 4 (2019) Identification
+ts5 = ts[529729:564768,]   #Peak Year 5 (2023) Identification
+
+ggplot() +
+  geom_line(data = ts, aes(x = ts$time, y = ts$strflow), color = "grey", alpha = 1, linewidth = 1)+
+  geom_line(data = ts1, aes(x = ts1$time, y = ts1$strflow), color = "red", alpha = 1, linewidth = 1)+
+  geom_line(data = ts2, aes(x = ts2$time, y = ts2$strflow), color = "orange", alpha = 1, linewidth = 1)+
+  geom_line(data = ts3, aes(x = ts3$time, y = ts3$strflow), color = "green", alpha = 1, linewidth = 1)+
+  geom_line(data = ts4, aes(x = ts4$time, y = ts4$strflow), color = "blue", alpha = 1, linewidth = 1)+
+  geom_line(data = ts5, aes(x = ts5$time, y = ts5$strflow), color = "violet", alpha = 1, linewidth = 1)+
+  labs(x = "Time",
+       y = "Q (ft3/d)")+
+  #xlim(43965, 53565) +         #2009 Recession  
+  #xlim(148029, 157629) +       #2012 Recession
+  #xlim(287997, 297597) +       #2016 Recession
+  #xlim(396189, 405789) +       #2019 Recession
+  #xlim(535965, 543837) +       #2023 Recession
+  #xlim(52413, 62108) +   #Year 1 Potential Recession Limb
+  #xlim(160797, 170492) + #Year 2 Potential Recession Limb
+  #xlim(300669, 310364) + #Year 3 Potential Recession Limb
+  #xlim(409725, 419424) + #Year 4 Potential Recession Limb
+  #xlim(553629, 563328) + #Year 5 Potential Recession Limb
+  ylim(0,1000) +
+  theme_classic()
+
+peak_1 <- c(52413:62108)    # User action: define the beggining and end of the peak (x axis) 2009 -> 2009-05-22 to 2009-08-30
+peak_2 <- c(160797:170492)  # User action: define the beggining and end of the peak (x axis) 2012 -> 2012-06-24 to 2012-10-02
+peak_3 <- c(300669:310364)  # User action: define the beggining and end of the peak (x axis) 2016 -> 2016-06-20 to 2016-09-28
+peak_4 <- c(409725:419424)  # User action: define the beggining and end of the peak (x axis) 2019 -> 2019-07-31 to 2019-11-08
+peak_5 <- c(553629:563328)  # User action: define the beggining and end of the peak (x axis) 2023 -> 2023-09-07 to 2023-12-06
+
+peak_1_data <- as.data.frame(ts[peak_1,])
+ggplotly(ggplot(peak_1_data, aes(x = seq(1, length(time), 1)))+
+           geom_line(aes(y = strflow))) 
+
+peak_2_data <- as.data.frame(ts[peak_2,])
+ggplotly(ggplot(peak_2_data, aes(x = seq(1, length(time), 1)))+
+           geom_line(aes(y = strflow))) 
+
+peak_3_data <- as.data.frame(ts[peak_3,])
+ggplotly(ggplot(peak_3_data, aes(x = seq(1, length(time), 1)))+
+           geom_line(aes(y = strflow))) 
+
+peak_4_data <- as.data.frame(ts[peak_4,])
+ggplotly(ggplot(peak_4_data, aes(x = seq(1, length(time), 1)))+
+           geom_line(aes(y = strflow))) 
+
+peak_5_data <- as.data.frame(ts[peak_5,])
+ggplotly(ggplot(peak_5_data, aes(x = seq(1, length(time), 1)))+
+           geom_line(aes(y = strflow))) 
+
+peak_1_recesion <- c(1:9696)  # # User action: define the beggining and end of the recession curve (x axis)
+peak_2_recesion <- c(1:9696) # # User action: define the beggining and end of the recession curve (x axis)
+peak_3_recesion <- c(1:9696)  # # User action: define the beggining and end of the recession curve (x axis)
+peak_4_recesion <- c(1:9700)  # # User action: define the beggining and end of the recession curve (x axis)
+peak_5_recesion <- c(1:9700)  # # User action: define the beggining and end of the recession curve (x axis)
+
+plot(peak_1_data$strflow[peak_1_recesion]~peak_1_data$time[peak_1_recesion], type = "l")
+plot(peak_2_data$strflow[peak_2_recesion]~peak_2_data$time[peak_2_recesion], type = "l")
+plot(peak_3_data$strflow[peak_3_recesion]~peak_3_data$time[peak_3_recesion], type = "l")
+plot(peak_4_data$strflow[peak_4_recesion]~peak_4_data$time[peak_4_recesion], type = "l")
+plot(peak_5_data$strflow[peak_5_recesion]~peak_5_data$time[peak_5_recesion], type = "l")
+
+plot(log(peak_1_data$strflow[peak_1_recesion])~peak_1_data$time[peak_1_recesion], type = "l")
+plot(log(peak_2_data$strflow[peak_2_recesion])~peak_2_data$time[peak_2_recesion], type = "l")
+plot(log(peak_3_data$strflow[peak_3_recesion])~peak_3_data$time[peak_3_recesion], type = "l")
+plot(log(peak_4_data$strflow[peak_4_recesion])~peak_4_data$time[peak_4_recesion], type = "l")
+plot(log(peak_5_data$strflow[peak_5_recesion])~peak_5_data$time[peak_5_recesion], type = "l")
+
+reg_pk1 <- lm(log(peak_1_data$strflow[peak_1_recesion])~ seq(1, length(peak_1_data$time[peak_1_recesion]), 1)) 
+sum_reg_pk1 <- summary(reg_pk1) 
+rec_const_pk1 <- sum_reg_pk1$coefficients[2,1] 
+adj_r2_pk1 <- sum_reg_pk1$adj.r.squared 
+alpha_value1 <- 2.71828182846^(rec_const_pk1) 
+
+reg_pk2 <- lm(log(peak_2_data$strflow[peak_2_recesion])~ seq(1, length(peak_2_data$time[peak_2_recesion]), 1)) 
+sum_reg_pk2 <- summary(reg_pk2) 
+rec_const_pk2 <- sum_reg_pk2$coefficients[2,1] 
+adj_r2_pk2 <- sum_reg_pk2$adj.r.squared 
+alpha_value2 <- 2.71828182846^(rec_const_pk2)  
+
+reg_pk3 <- lm(log(peak_3_data$strflow[peak_3_recesion])~ seq(1, length(peak_3_data$time[peak_3_recesion]), 1)) 
+sum_reg_pk3 <- summary(reg_pk3)
+rec_const_pk3 <- sum_reg_pk3$coefficients[2,1] 
+adj_r2_pk3 <- sum_reg_pk3$adj.r.squared 
+alpha_value3 <- 2.71828182846^(rec_const_pk3) 
+
+reg_pk4 <- lm(log(peak_4_data$strflow[peak_4_recesion])~ seq(1, length(peak_4_data$time[peak_4_recesion]), 1)) 
+sum_reg_pk4 <- summary(reg_pk4)
+rec_const_pk4 <- sum_reg_pk4$coefficients[2,1] 
+adj_r2_pk4 <- sum_reg_pk4$adj.r.squared
+alpha_value4 <- 2.71828182846^(rec_const_pk4)
+
+reg_pk5 <- lm(log(peak_5_data$strflow[peak_5_recesion])~ seq(1, length(peak_5_data$time[peak_5_recesion]), 1))
+sum_reg_pk5 <- summary(reg_pk5) 
+rec_const_pk5 <- sum_reg_pk5$coefficients[2,1] 
+adj_r2_pk5 <- sum_reg_pk5$adj.r.squared
+alpha_value5 <- 2.71828182846^(rec_const_pk5)
+
+dfa <- list(alpha_value1, alpha_value2, alpha_value3, alpha_value4, alpha_value5) 
+ts = ts[,-5]
+
+strflow_ts <- ts[,1]  
+SC_ts <- ts[,2] 
+SC_rain_ts <- ts[,3] 
+
+ts <- ts[7297:585500, ]
+rownames(ts) <- 1:nrow(ts)
+ts$time = 1:nrow(ts)
+
+rm(list = setdiff(ls(), c("ts", "dfa")))
+
+ts_int <- data.frame(datetime = index(ts), coredata(ts))
+
+################################################################################
+strflow = as.data.frame(ts_int)
+strflow = strflow[c(2,5)]
+strflow = na.omit(strflow)
+
+ts_int$strflow = signal::interp1(strflow$time, strflow$strflow, ts_int$time, "pchip", extrap = NA)
+ts_int$strflow <- ifelse(ts_int$strflow < 0, 0, ts_int$strflow)
+
+SC = as.data.frame(ts_int)
+SC = SC[c(3,5)]
+SC = na.omit(SC)
+
+ts_int$SC = signal::interp1(SC$time, SC$SC, ts_int$time, "pchip", extrap = NA)
+ts_int$SC <- ifelse(ts_int$SC < 0, 0, ts_int$SC)
+
+################################################################################
+rm(list = setdiff(ls(), c("ts", "dfa", "ts_int")))   #Pre-Processing Clearing
