@@ -42,14 +42,12 @@ obj_one <- function(x) {
 
   b <- rep(NaN, length(dfl$strflow))
   
-  b[1] <- dfl$strflow[1]*x2*0.9  # x2 = BFImax
+  b[1] <- dfl$strflow[1]*x2*0.9
   
   for (i in 2:length(dfl$strflow)){
-    # calculate bf using digital filter
     b[i] <- (((1-x2)*x1*b[i-1]) + ((1-x1)*x2*dfl$strflow[i]))/(1-x1*x2) 
     
-    # make sure 0 <= bf <= strflow
-    if (is.na(b[i]))    b[i] <- dfl$strflow[i]  # set logical index to prevent crash at BFImax = 1
+    if (is.na(b[i]))    b[i] <- dfl$strflow[i]  
     if (b[i]<0|is.na(b[i]))    b[i] <- dfl$strflow[i]*x2*0.9  
     if (b[i]>dfl$strflow[i]) b[i] <- dfl$strflow[i]
   }
@@ -58,7 +56,7 @@ obj_one <- function(x) {
 
   dfl$y = dfl$strflow - b
 
-  dfl$bfi <- ifelse(dfl$strflow == 0, -1, dfl$b/dfl$strflow)   #Test B   
+  dfl$bfi <- ifelse(dfl$strflow == 0, -1, dfl$b/dfl$strflow)  
 
   dfl$bfi <- round(dfl$bfi, digits = 6)   
 
@@ -90,8 +88,8 @@ obj_one <- function(x) {
   dfl_filt$time = 1:nrow(dfl_filt)
   
   ################################################################################
-  ph = round(x[8], digits = 0)
-  pl = round(x[9], digits = 0)
+  ph = round(x[8], digits = 6)
+  pl = round(x[9], digits = 6)
   
   peaks_bfi <- pracma::findpeaks(dfl_filt$bfi, minpeakheight = ph, minpeakdistance = pl)
   ps <- if (!is.null(peaks_bfi)) as.data.frame(peaks_bfi)$V2 else numeric(0)
@@ -163,7 +161,6 @@ obj_one <- function(x) {
 }
 
 
-# -------- 2) Batch-safe wrapper (guarantees k×3 matrix for ecr) --------------
 obj <- function(x) {
   penalty <- 1e12
   safe_one <- function(v) {
@@ -178,34 +175,29 @@ obj <- function(x) {
     k <- nrow(x)
     ans <- t(vapply(seq_len(k), function(i) safe_one(x[i, , drop=FALSE]), numeric(4)))
     ans[!is.finite(ans)] <- penalty
-    dim(ans) <- c(k, 4)   # enforce matrix even when k == 1
+    dim(ans) <- c(k, 4)   
     ans
   }
 }
 
 
-# -------- 3) Bounds / dimensions (from your earlier setup) -------------------
-lower <- c(0.9997, 0, 1, 0, 0, -100, -19200, 0, 96, 1, 0)
+lower <- c(0.9996, 0, 1, 0, 0, -100, -19200, 0, 96, 1, 0)
 upper <- c(0.9999, 1, 2, 1, 10, 100, 19200, 1, 9600, 2, 1)
 d <- length(lower)
-mu <- 10L            #Parent Population Size
-lambda <- 10L        #Offspring Population Size
+mu <- 1000L            
+lambda <- 1000L        
 
-# a "printer" terminator that fires every generation
 printer <- makeTerminator(
   condition.fun = function(log) {
-    # ecr updates the logger once before the loop and then each generation,
-    # so current generation = nrow(getStatistics(log)) - 1
     it <- nrow(getStatistics(log)) - 1L
     message(sprintf("NSGA-II iteration: %d", it))
-    FALSE  # never stop; just print
+    FALSE  
   },
   name = "printer",
   message = "progress"
 )
 
 
-# -------- 4) CHUNK 1: run and save survivors (seed) --------------------------
 tic()
 set.seed(1970)
 res_1 <- ecr::nsga2(
@@ -215,22 +207,20 @@ res_1 <- ecr::nsga2(
   minimize      = rep(TRUE, 4),
   lower         = lower, upper = upper,
   mu            = mu, lambda = lambda,
-  terminators = list(printer, stopOnIters(5L)),   #Number of Generations
+  terminators = list(printer, stopOnIters(100L)),   
 )
 
 toc()
 
-seed <- res_1$pareto.set          # list of decision vectors
+seed <- res_1$pareto.set          
 #saveRDS(seed, "seed_nsga2_chunk1.rds")
 #saveRDS(res_1, "res_1_nsga2_chunk1.rds")
 
-# -------- 3) Inspect results --------------------------------------------------
-str(res_1$pareto.front)  # matrix of 4 objectives
-length(res_1$pareto.set) # number of non-dominated solutions
+str(res_1$pareto.front)  
+length(res_1$pareto.set) 
 
 ###############################################################################
 ###############################################################################
-# ---------- TOPSIS helper ----------
 topsis <- function(Y, weights = NULL, benefit = NULL) {
   Y <- as.matrix(Y)
   stopifnot(nrow(Y) > 0, ncol(Y) > 0)
@@ -239,22 +229,18 @@ topsis <- function(Y, weights = NULL, benefit = NULL) {
   if (is.null(weights)) weights <- rep(1/m, m)
   weights <- weights / sum(weights)
   
-  if (is.null(benefit)) benefit <- rep(FALSE, m)  # FALSE = cost (minimize), TRUE = benefit (maximize)
+  if (is.null(benefit)) benefit <- rep(FALSE, m)  
   stopifnot(length(weights) == m, length(benefit) == m)
   
-  # 1) Vector normalization
   denom <- sqrt(colSums(Y^2))
   denom[denom == 0] <- 1
   Z <- sweep(Y, 2, denom, "/")
   
-  # 2) Weights
   WZ <- sweep(Z, 2, weights, "*")
   
-  # 3) Ideal best/worst by objective type
   ideal_best  <- sapply(seq_len(m), function(j) if (benefit[j]) max(WZ[, j]) else min(WZ[, j]))
   ideal_worst <- sapply(seq_len(m), function(j) if (benefit[j]) min(WZ[, j]) else max(WZ[, j]))
   
-  # 4) Distances & closeness
   d_pos <- sqrt(rowSums((sweep(WZ, 2, ideal_best , "-"))^2))
   d_neg <- sqrt(rowSums((sweep(WZ, 2, ideal_worst, "-"))^2))
   Cstar <- d_neg / pmax(d_pos + d_neg, .Machine$double.eps)
@@ -269,18 +255,14 @@ topsis <- function(Y, weights = NULL, benefit = NULL) {
 }
 
 ################################################################################
-# ---------- Apply TOPSIS to ecr output (res1) ----------
-# Pareto front (objectives) and corresponding decision vectors
-Y <- res_1$pareto.front          # matrix: rows = solutions, cols = f1..f4
-S <- res_1$pareto.set            # list: each element is a decision vector x
+Y <- res_1$pareto.front          
+S <- res_1$pareto.set            
 
-# Weights & benefit flags (adjust if you want different tradeoffs)
-w <- c(1, 0.5, 0.5, 1)              # equal weights
-benefit <- c(FALSE, FALSE, FALSE, FALSE)  # all costs (minimize)
+w <- c(1, 0.5, 0.5, 1)             
+benefit <- c(FALSE, FALSE, FALSE, FALSE)  
 
 tp <- topsis(Y, weights = w, benefit = benefit)
 
-# Best trade-off solution
 best_idx   <- tp$best_id
 best_score <- tp$score[best_idx]
 x_star     <- S[[best_idx]]
@@ -288,7 +270,6 @@ x_star     <- S[[best_idx]]
 cat("TOPSIS picked solution", best_idx, "with C* =", round(best_score, 4), "\n")
 print(x_star)
 
-# (Optional) top-5 compromises
 top_k <- order(-tp$score)[1:min(5, length(tp$score))]
 Fs = data.frame(
   id    = top_k,
@@ -297,16 +278,13 @@ Fs = data.frame(
 )
 Fs = Fs[1,]
 
-## plot results
-# 3D
+
 library(plotly)
-# Option 1: Start with an empty figure
 fig <- plot_ly(data = Y, x = ~y1, y = ~y2, z = ~y4, type = "scatter3d", mode = "markers", name = "Pareto Front", marker = list(size = 2)) %>%
   add_trace(data = Fs, x = ~y1, y = ~y2, z = ~y4, type = "scatter3d", mode = "markers", name = "Optimum", marker = list(size = 5))
 fig
 
 
-## export as csv
 write.csv(as.data.frame(x_star),"out_test.csv")
 write.csv(as.data.frame(Y),"Y_test.csv")
 saveRDS(S, "pareto_set.rds")
