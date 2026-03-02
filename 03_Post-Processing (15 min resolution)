@@ -12,17 +12,17 @@ library(plotly)
 library(ineq)
 
 
-x1	=	0.999712939
-x2	=	0.833110908
-x3	=	1.680145982
-x4	=	0.590312658
-x5	=	5.3267149
-x6	=	23.58376658
-x7	=	5416.529504
-x8	=	0.57313746
-x9	=	96.35439293
-x10	=	1.848215808
-x11	=	0.999958951
+x1	=	
+x2	=	
+x3	=	
+x4	=	
+x5	=	
+x6	=	
+x7	=	
+x8	=	
+x9	=	
+x10	=	
+x11	=	
 
 ################################################################################
 SC_rain = as.data.frame(ts_int)
@@ -49,13 +49,12 @@ x2 = x2
 
 b <- rep(NaN, length(dfl$strflow))
 
-
 b[1] <- dfl$strflow[1]*x2*0.9  
 
 for (i in 2:length(dfl$strflow)){
   b[i] <- (((1-x2)*x1*b[i-1]) + ((1-x1)*x2*dfl$strflow[i]))/(1-x1*x2)
   
-    if (is.na(b[i]))    b[i] <- dfl$strflow[i]  # set logical index to prevent crash at BFImax = 1
+  if (is.na(b[i]))    b[i] <- dfl$strflow[i]  
   if (b[i]<0|is.na(b[i]))    b[i] <- dfl$strflow[i]*x2*0.9 
   if (b[i]>dfl$strflow[i]) b[i] <- dfl$strflow[i]
 }
@@ -71,7 +70,6 @@ dfl$bfi <- round(dfl$bfi, digits = 6)
 ################################################################################
 ts_int = na.omit(ts_int) 
 dfl = na.omit(dfl)
-dfl <- dfl[, -1]
 
 ss = try(smooth.spline(index(ts_int), ts_int$SC_rain*x5, spar = x4), silent = TRUE)
 if ((x4) == 0) {
@@ -87,7 +85,7 @@ lag = round(x7, digits = 0)
 SCy_lag = (stats::lag(ts$SCy,-lag))
 
 dfl$SCy = SCy_lag
-colnames(dfl)[8] <- "SCy"
+colnames(dfl)[9] <- "SCy"
 
 dfl = na.omit(dfl)
 
@@ -99,8 +97,8 @@ dfl_filt$time = 1:nrow(dfl_filt)
 
 ################################################################################
 
-ph = round(x8, digits = 0)
-pl = round(x9, digits = 0)
+ph = round(x8, digits = 6)
+pl = round(x9, digits = 6)
 
 peaks_bfi <- pracma::findpeaks(dfl_filt$bfi, minpeakheight = ph, minpeakdistance = pl)
 ps <- if (!is.null(peaks_bfi)) as.data.frame(peaks_bfi)$V2 else numeric(0)
@@ -172,19 +170,30 @@ if (x2 ==0 || x2 ==1 || min(ts_int$SC_rain) <=0 || min(ts_int$SCy) <=0 || min(df
 write.csv(as.data.frame(dfl),"dfl.csv")
 
 ################################################################################
-
 ## Plots
 
+print(f1)
+print(f2)
+print(f3)
+print(f4)
+
+dfl_filt$strflow <- dfl_filt$strflow * 0.0283168
+dfl_filt$b <- dfl_filt$b * 0.0283168
+dfl_filt$y <- dfl_filt$y * 0.0283168
+
+#dfl_filt$strflow <- log(dfl_filt$strflow)
+#dfl_filt$b <- log(dfl_filt$b)
+#dfl_filt$y <- log(dfl_filt$y)
 ################################################################################
 ggplot() +
-  #p0 <- ggplot() +
-  geom_line(data = dfl_filt, aes(x = index(dfl_filt), y = strflow), color = "grey", alpha = 1, linewidth = 1)+
-  geom_line(data = dfl_filt, aes(x = index(dfl_filt), y = b), color = "blue", alpha = 1, linewidth = 0.5)+
-  geom_line(data = dfl_filt, aes(x = index(dfl_filt), y = y), color = "red", alpha = 1, linewidth = 0.5)+
-  labs(x = "Time",
-       y = "Flow (ft3/d)")+
-  #xlim(0, 200) +
-  #ylim(0,200) +
+#p0 <- ggplot() +
+  geom_line(data = dfl_filt, aes(x = dfl_filt$time, y = bfi), color = "grey", alpha = 1, linewidth = 1)+
+  geom_point(data = dflp, aes(x = dflp$time, y = bfi), color = "red", alpha = 1)+
+  labs(x = "Time (days)",
+       y = "bfi",
+       title = "bfi peaks - bfi")+
+  #xlim(3000, 7000) +
+  #ylim(0,500) +
   theme_classic()
 
 #p0_interactive <- ggplotly(p0)
@@ -192,14 +201,13 @@ ggplot() +
 
 ################################################################################
 ggplot() +
-  #p1 <- ggplot() +
-  geom_line(data = dfl_filt, aes(x = index(dfl_filt), y = SC), color = "grey", alpha = 1, linewidth = 1)+
-  geom_line(data = dfl_filt, aes(x = index(dfl_filt), y = SCb), color = "blue", alpha = 1, linewidth = 0.5)+
-  geom_line(data = dfl_filt, aes(x = index(dfl_filt), y = SCy), color = "red", alpha = 1, linewidth = 0.5)+
+#p1 <- ggplot() +
+  geom_line(data = dfl_filt, aes(x = dfl_filt$time, y = SC), color = "grey", alpha = 1, linewidth = 1)+
+  geom_point(data = dflp, aes(x = dflp$time, y = SC), color = "red", alpha = 1)+
   labs(x = "Time (days)",
        y = "SC (µS/cm)",
-       title = "Cholollo Campground-15 Time vs SC")+
-  #xlim(0, 7000) +
+       title = "bfi peaks - SC")+
+  #xlim(3000, 7000) +
   #ylim(0,500) +
   theme_classic()
 
@@ -207,67 +215,175 @@ ggplot() +
 #p1_interactive
 
 ################################################################################
-ggplot() +
-  #p2 <- ggplot() +
-  geom_line(data = dfl, aes(x = index(dfl), y = bfi), color = "grey", alpha = 1, linewidth = 1)+
-  labs(x = "Time (days)",
-       y = "BFI",
-       title = "Cholollo Campground-15 Time vs SC")+
-  #xlim(0, 7000) +
-  ylim(-1.0, 1.0) +
-  theme_classic()
+library(ggplot2)
+library(plotly)
+library(dplyr)
+library(tidyr)
+library(Metrics)
+library(scales)
 
-#p2_interactive <- ggplotly(p2)
-#p2_interactive
+dfl_filt_clean <- dfl_filt %>%
+  mutate(across(c(SC, SCb, SCy), as.numeric)) %>% 
+  mutate(time = index(dfl_filt))                   
+
+dfl_long <- dfl_filt_clean %>%
+  pivot_longer(cols = c(SC, SCb, SCy),
+               names_to = "Type",
+               values_to = "Value")
+
+dt_vals <- dfl_filt$datetime  
+
+tick_years <- c(2009, 2014, 2019, 2024)  
+tick_dates <- dt_vals[format(dt_vals, "%Y-%m-%d %H:%M:%S") %in%
+                        paste0(tick_years, "-01-01 00:00:00")]
+
+brks <- which(dt_vals %in% tick_dates) 
+
+p3 <- ggplot(dfl_long, aes(x = time, y = Value, color = Type)) +
+  geom_line(alpha = 1, linewidth = 0.5) +  
+  scale_color_manual(values = c("SC" = "grey", "SCb" = "blue", "SCy" = "red")) +
+  labs(
+    x = "Time (15-minute interval)",
+    y = "SC (µS/cm)",
+    title = "Time vs SC",
+    color = "Line Type"
+  ) +
+  scale_x_continuous(
+    breaks = brks,
+    labels = format(dt_vals[brks], "%Y")  
+  ) +
+  theme_classic() +
+  theme(
+    axis.title = element_text(size = 18, face = "bold"),
+    axis.text  = element_text(size = 14, face = "bold"),
+    plot.title = element_text(size = 20, face = "bold"),
+    legend.position = c(0.05, 0.95),       
+    legend.justification = c("left", "top"),
+    legend.title = element_text(size = 16, face = "bold"),
+    legend.text  = element_text(size = 14, face = "bold")
+  )
+
+p3_interactive <- ggplotly(p3)
+p3_interactive
+
+p3_interactive <- ggplotly(p3) %>%
+  layout(
+    legend = list(
+      x = 0.02,          
+      y = 1.02,          
+      xanchor = "left",  
+      yanchor = "top"    
+    )
+  )
+
+p3_interactive
+
+ggsave("Time_vs_SC_plot.png", plot = p3, width = 9, height = 4, dpi = 300)
+
+################################################################################
+dfl_filt_clean <- dfl_filt %>%
+  mutate(across(c(SC, SCq), as.numeric)) %>%  
+  mutate(time = index(dfl_filt))              
+
+dfl_long <- dfl_filt_clean %>%
+  pivot_longer(cols = c(SC, SCq),
+               names_to = "Type",
+               values_to = "Value")
+
+dt_vals <- dfl_filt$datetime  
+
+tick_years <- c(2009, 2014, 2019, 2024)  
+tick_dates <- dt_vals[format(dt_vals, "%Y-%m-%d %H:%M:%S") %in%
+                        paste0(tick_years, "-01-01 00:00:00")]
+
+brks <- which(dt_vals %in% tick_dates)
+
+p4 <- ggplot(dfl_long, aes(x = time, y = Value, color = Type)) +
+  geom_line(alpha = 1, linewidth = 0.5) +  
+  scale_color_manual(values = c("SC" = "grey", "SCq" = "purple")) +
+  labs(
+    x = "Time (15-minute interval)",
+    y = "SC (µS/cm)",
+    title = "Time vs SCq",
+    color = "Line Type"
+  ) +
+  scale_x_continuous(
+    breaks = brks,
+    labels = format(dt_vals[brks], "%Y") 
+  ) +
+  theme_classic() +
+  theme(
+    axis.title = element_text(size = 18, face = "bold"),
+    axis.text  = element_text(size = 14, face = "bold"),
+    plot.title = element_text(size = 20, face = "bold"),
+    legend.position = c(0.05, 0.95),
+    legend.justification = c("left", "top"),
+    legend.title = element_text(size = 16, face = "bold"),
+    legend.text  = element_text(size = 14, face = "bold")
+  )
+
+p4_interactive <- ggplotly(p4)
+p4_interactive
+
+p4_interactive <- ggplotly(p4) %>%
+  layout(
+    legend = list(
+      x = 0.02,
+      y = 1.02,
+      xanchor = "left",
+      yanchor = "top"
+    )
+  )
+
+p4_interactive
+
+ggsave("Time_vs_SCq_plot.png", plot = p4, width = 9, height = 4, dpi = 300)
 
 ################################################################################
 rmse_val <- Metrics::rmse(cali$SC, cali$SCq)
 percent_error <- mean(abs((cali$SC - cali$SCq) / cali$SC)) * 100
 
-ggplot(cali, aes(x = SC, y = SCq)) +  
-#p3 <- ggplot(cali, aes(x = SC, y = SCq)) +  
-  geom_point(shape = 18, color = "grey") +
-  geom_smooth(method = "lm") +
-  labs(x = "Measured SC (µS/cm)", 
-       y = "Modeled SC (µS/cm)",
-       title = "Cholollo Campground 15 - Measured vs Modeled SC") +
-  annotate("text", x = Inf, y = -Inf, 
-           label = paste0("RMSE = ", round(rmse_val, 2), 
-                          "\nPercent Error = ", round(percent_error, 2), "%"), 
-           hjust = 1.1, vjust = -1.5, size = 4, fontface = "bold") +
-  theme_classic()
+p5 <- ggplot(cali, aes(x = SC, y = SCq)) +
+  geom_point(
+    shape = 18,       
+    color = "grey",
+    alpha = 0.6,
+    size = 2
+  ) +
+  geom_smooth(
+    method = "lm",    
+    color = "blue",
+    linewidth = 1
+  ) +
+  labs(
+    x = "Measured SC (µS/cm)",
+    y = "Modeled SC (µS/cm)",
+    title = "Measured vs Modeled SC"
+  ) +
+  theme_classic() +
+  theme(
+    axis.title = element_text(size = 20, face = "bold", color = "black"),   
+    axis.text  = element_text(size = 16, color = "black"),                 
+    plot.title = element_text(size = 24, face = "bold", color = "black")   
+  ) +
+  annotate(
+    "label",
+    x = -Inf,
+    y = Inf,
+    label = paste0(
+      "RMSE = ", round(rmse_val, 2), "\n",
+      "Percent Error = ", round(percent_error, 2), "%\n",
+      "BFImax = ", round(x2, 3)
+    ),
+    hjust = 0, 
+    vjust = 1, 
+    label.padding = unit(0.4, "lines"),
+    size = 6,  
+    fontface = "bold", 
+    fill = "white",
+    label.size = 0
+  )
 
-p3_interactive <- ggplotly(p3)
-p3_interactive
-ggsave("p10_plot.png", plot = p10, width = 9, height = 4, dpi = 300)
+ggsave("Measured_vs_Modeled SC.png", plot = p5, width = 12, height = 5, dpi = 300)
 
 ################################################################################
-ggplot() +
-  #p4 <- ggplot() +
-  geom_line(data = dfl_filt, aes(x = dfl_filt$time, y = bfi), color = "grey", alpha = 1, linewidth = 1)+
-  geom_point(data = dflp, aes(x = dflp$time, y = bfi), color = "red", alpha = 1)+
-  labs(x = "Time (days)",
-       y = "bfi",
-       title = "Cholollo Campground-15 bfi peaks - bfi")+
-  #xlim(3000, 7000) +
-  #ylim(-1.0, 1.0) +
-  theme_classic()
-
-#p4_interactive <- ggplotly(p4)
-#p4_interactive
-
-################################################################################
-ggplot() +
-  #p5 <- ggplot() +
-  geom_line(data = dfl_filt, aes(x = dfl_filt$time, y = SC), color = "grey", alpha = 1, linewidth = 1)+
-  geom_point(data = dflp, aes(x = dflp$time, y = SC), color = "red", alpha = 1)+
-  #geom_vline(xintercept = SCqfp$i, color = "black", linetype = "dashed", linewidth = 0.3)+
-  labs(x = "Time (days)",
-       y = "SC (µS/cm)",
-       title = "Cholollo Campground-15 bfi peaks - SC")+
-  #xlim(3000, 7000) +
-  #ylim(0,500) +
-  theme_classic()
-
-#p5_interactive <- ggplotly(p5)
-#p5_interactive
