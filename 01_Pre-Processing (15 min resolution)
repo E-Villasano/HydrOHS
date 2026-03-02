@@ -91,8 +91,11 @@ ts <- xts(ts[, -1], order.by = ts$datetime)
 sum(is.na(ts$strflow))
 sum(is.na(ts$SC))
 sum(is.na(ts$SC_rain))
-max_value <- max(ts$SC, na.rm = TRUE)
-min_value <- min(ts$SC, na.rm = TRUE)
+
+max_strflow <- max(ts$strflow, na.rm = TRUE)
+min_strflow <- min(ts$strflow, na.rm = TRUE)
+max_SC <- max(ts$SC, na.rm = TRUE)
+min_SC <- min(ts$SC, na.rm = TRUE)
 
 rm(list = setdiff(ls(), "ts"))
 
@@ -112,24 +115,27 @@ ggplot() +
   geom_line(data = ts5, aes(x = ts5$time, y = ts5$strflow), color = "violet", alpha = 1, linewidth = 1)+
   labs(x = "Time",
        y = "Q (ft3/d)")+
-  #xlim(43965, 53565) +         #2009 Recession  
-  #xlim(148029, 157629) +       #2012 Recession
-  #xlim(287997, 297597) +       #2016 Recession
-  #xlim(396189, 405789) +       #2019 Recession
-  #xlim(535965, 543837) +       #2023 Recession
+  #xlim(38881, 73920) +         #2009 Recession  
+  #xlim(144001, 179136) +       #2012 Recession
+  #xlim(284257, 319392) +       #2016 Recession
+  #xlim(389473, 424512) +       #2019 Recession
+  #xlim(529729, 564768) +       #2023 Recession
   #xlim(52413, 62108) +   #Year 1 Potential Recession Limb
   #xlim(160797, 170492) + #Year 2 Potential Recession Limb
   #xlim(300669, 310364) + #Year 3 Potential Recession Limb
   #xlim(409725, 419424) + #Year 4 Potential Recession Limb
   #xlim(553629, 563328) + #Year 5 Potential Recession Limb
-  ylim(0,1000) +
+  #ylim(0,100) +
   theme_classic()
 
-peak_1 <- c(52413:62108)    # User action: define the beggining and end of the peak (x axis) 2009 -> 2009-05-22 to 2009-08-30
-peak_2 <- c(160797:170492)  # User action: define the beggining and end of the peak (x axis) 2012 -> 2012-06-24 to 2012-10-02
-peak_3 <- c(300669:310364)  # User action: define the beggining and end of the peak (x axis) 2016 -> 2016-06-20 to 2016-09-28
-peak_4 <- c(409725:419424)  # User action: define the beggining and end of the peak (x axis) 2019 -> 2019-07-31 to 2019-11-08
-peak_5 <- c(553629:563328)  # User action: define the beggining and end of the peak (x axis) 2023 -> 2023-09-07 to 2023-12-06
+#p0_interactive <- ggplotly(p0)
+#p0_interactive
+
+peak_1 <- c(55197:64892)    # User action: define the beggining and end of the peak (x axis) 2009 -> 2009-06-20:2009-09-28
+peak_2 <- c(159357:169052)  # User action: define the beggining and end of the peak (x axis) 2012 -> 2012-06-09:2012-09-17
+peak_3 <- c(296733:306428)  # User action: define the beggining and end of the peak (x axis) 2016 -> 2016-05-10:2016-08-18
+peak_4 <- c(405597:415292)  # User action: define the beggining and end of the peak (x axis) 2019 -> 2019-06-18:2019-09-26
+peak_5 <- c(550557:560256)  # User action: define the beggining and end of the peak (x axis) 2023 -> 2023-08-06:2023-11-14
 
 peak_1_data <- as.data.frame(ts[peak_1,])
 ggplotly(ggplot(peak_1_data, aes(x = seq(1, length(time), 1)))+
@@ -152,9 +158,9 @@ ggplotly(ggplot(peak_5_data, aes(x = seq(1, length(time), 1)))+
            geom_line(aes(y = strflow))) 
 
 peak_1_recesion <- c(1:9696)  # # User action: define the beggining and end of the recession curve (x axis)
-peak_2_recesion <- c(1:9696) # # User action: define the beggining and end of the recession curve (x axis)
+peak_2_recesion <- c(1:9696)  # # User action: define the beggining and end of the recession curve (x axis)
 peak_3_recesion <- c(1:9696)  # # User action: define the beggining and end of the recession curve (x axis)
-peak_4_recesion <- c(1:9700)  # # User action: define the beggining and end of the recession curve (x axis)
+peak_4_recesion <- c(1:9696)  # # User action: define the beggining and end of the recession curve (x axis)
 peak_5_recesion <- c(1:9700)  # # User action: define the beggining and end of the recession curve (x axis)
 
 plot(peak_1_data$strflow[peak_1_recesion]~peak_1_data$time[peak_1_recesion], type = "l")
@@ -169,11 +175,11 @@ plot(log(peak_3_data$strflow[peak_3_recesion])~peak_3_data$time[peak_3_recesion]
 plot(log(peak_4_data$strflow[peak_4_recesion])~peak_4_data$time[peak_4_recesion], type = "l")
 plot(log(peak_5_data$strflow[peak_5_recesion])~peak_5_data$time[peak_5_recesion], type = "l")
 
-reg_pk1 <- lm(log(peak_1_data$strflow[peak_1_recesion])~ seq(1, length(peak_1_data$time[peak_1_recesion]), 1)) 
-sum_reg_pk1 <- summary(reg_pk1) 
-rec_const_pk1 <- sum_reg_pk1$coefficients[2,1] 
+reg_pk1 <- lm(log(peak_1_data$strflow[peak_1_recesion])~ seq(1, length(peak_1_data$time[peak_1_recesion]), 1))
+sum_reg_pk1 <- summary(reg_pk1)
+rec_const_pk1 <- sum_reg_pk1$coefficients[2,1]
 adj_r2_pk1 <- sum_reg_pk1$adj.r.squared 
-alpha_value1 <- 2.71828182846^(rec_const_pk1) 
+alpha_value1 <- 2.71828182846^(rec_const_pk1)  
 
 reg_pk2 <- lm(log(peak_2_data$strflow[peak_2_recesion])~ seq(1, length(peak_2_data$time[peak_2_recesion]), 1)) 
 sum_reg_pk2 <- summary(reg_pk2) 
@@ -182,22 +188,22 @@ adj_r2_pk2 <- sum_reg_pk2$adj.r.squared
 alpha_value2 <- 2.71828182846^(rec_const_pk2)  
 
 reg_pk3 <- lm(log(peak_3_data$strflow[peak_3_recesion])~ seq(1, length(peak_3_data$time[peak_3_recesion]), 1)) 
-sum_reg_pk3 <- summary(reg_pk3)
+sum_reg_pk3 <- summary(reg_pk3) 
 rec_const_pk3 <- sum_reg_pk3$coefficients[2,1] 
 adj_r2_pk3 <- sum_reg_pk3$adj.r.squared 
-alpha_value3 <- 2.71828182846^(rec_const_pk3) 
+alpha_value3 <- 2.71828182846^(rec_const_pk3)  
 
 reg_pk4 <- lm(log(peak_4_data$strflow[peak_4_recesion])~ seq(1, length(peak_4_data$time[peak_4_recesion]), 1)) 
-sum_reg_pk4 <- summary(reg_pk4)
+sum_reg_pk4 <- summary(reg_pk4) 
 rec_const_pk4 <- sum_reg_pk4$coefficients[2,1] 
-adj_r2_pk4 <- sum_reg_pk4$adj.r.squared
-alpha_value4 <- 2.71828182846^(rec_const_pk4)
+adj_r2_pk4 <- sum_reg_pk4$adj.r.squared 
+alpha_value4 <- 2.71828182846^(rec_const_pk4)  
 
-reg_pk5 <- lm(log(peak_5_data$strflow[peak_5_recesion])~ seq(1, length(peak_5_data$time[peak_5_recesion]), 1))
+reg_pk5 <- lm(log(peak_5_data$strflow[peak_5_recesion])~ seq(1, length(peak_5_data$time[peak_5_recesion]), 1)) 
 sum_reg_pk5 <- summary(reg_pk5) 
 rec_const_pk5 <- sum_reg_pk5$coefficients[2,1] 
-adj_r2_pk5 <- sum_reg_pk5$adj.r.squared
-alpha_value5 <- 2.71828182846^(rec_const_pk5)
+adj_r2_pk5 <- sum_reg_pk5$adj.r.squared 
+alpha_value5 <- 2.71828182846^(rec_const_pk5)  
 
 dfa <- list(alpha_value1, alpha_value2, alpha_value3, alpha_value4, alpha_value5) 
 ts = ts[,-5]
