@@ -1,0 +1,201 @@
+pacman::p_load(pracma, ecr, KernSmooth, tictoc, SparseM, topsis, reshape2, cdata, tidyverse, mco, nsga2R, gsignal, spacetime, zoo, xts, SparseM, fANCOVA, signal, foreach, doParallel, grwat, adc, hydroGOF, parallel, doParallel, hydrostats, hydroEvents, tidyr, spatialEco, zoo, npreg, fANCOVA, forecast, FlowScreen, stinepack, imputeTS, missForest, Metrics, dplyr, tstools, tsbox, highfrequency, tidyverse, install = T)
+library(dplyr)
+library(lubridate)
+library(zoo)
+library(ggplot2)
+library(gridExtra)
+library(scales)
+library(imputeTS)
+library(fANCOVA)
+library(xts)
+
+mutate    <- dplyr::mutate
+filter    <- dplyr::filter
+select    <- dplyr::select
+summarise <- dplyr::summarise
+
+################################################################################
+df  <- as.data.frame(read.csv("Tule_CC_trim.csv"))
+MTN <- as.data.frame(read.csv("NTN-ca75-w-s-mg.csv"))
+MTN$volwt = MTN$Conduc*MTN$subppt/(mean(MTN$subppt))
+MTN = MTN[c(5,8)]
+MTN = MTN[22:276,]
+
+################################################################################
+strflow_dt = as.POSIXct(df$Date, format = "%m/%d/%Y")
+data_strflow = cbind(strflow_dt, df[c(2)])
+strflow_ts <- xts(data_strflow[,-1], order.by=data_strflow[,1])
+colnames(strflow_ts) <- c('strflow')
+
+SC_dt = as.POSIXct(df$Date, format = "%m/%d/%Y")
+data_SC = cbind(SC_dt, df[c(3)])
+SC_ts <- xts(data_SC[,-1], order.by=data_SC[,1])
+colnames(SC_ts) <- c('SC')
+
+SC_rain_dt = as.POSIXct(MTN$Date, format = "%m/%d/%Y")
+data_SC_rain = cbind(SC_rain_dt, MTN[c(2)])
+SC_rain_ts <- xts(data_SC_rain[,-1], order.by=data_SC_rain[,1])
+colnames(SC_rain_ts) <- c('SC_rain')
+
+################################################################################
+ts = merge(strflow_ts, SC_ts, SC_rain_ts)
+ts$time = 1:nrow(ts)
+ts_int <- data.frame(datetime = index(ts), coredata(ts))
+
+################################################################################
+sum(is.na(ts$strflow))
+sum(is.na(ts$SC))
+sum(is.na(ts$SC_rain))
+
+max_strflow <- max(ts$strflow, na.rm = TRUE)
+min_strflow <- min(ts$strflow, na.rm = TRUE)
+max_SC      <- max(ts$SC, na.rm = TRUE)
+min_SC      <- min(ts$SC, na.rm = TRUE)
+
+################################################################################
+strflow_ts$time = 1:nrow(strflow_ts)
+
+ts1 = strflow_ts[330:694,]     #Peak Year 1 (2009)
+ts2 = strflow_ts[1425:1790,]   #Peak Year 2 (2012)
+ts3 = strflow_ts[2886:3251,]   #Peak Year 3 (2016)
+ts4 = strflow_ts[3982:4346,]   #Peak Year 4 (2019)
+ts5 = strflow_ts[5443:5807,]   #Peak Year 5 (2023)
+
+ggplot() +
+  geom_line(data = strflow_ts, aes(x = strflow_ts$time, y = strflow_ts$strflow), color = "grey",   alpha = 1, linewidth = 1) +
+  geom_line(data = ts1,        aes(x = ts1$time,        y = ts1$strflow),        color = "red",    alpha = 1, linewidth = 1) +
+  geom_line(data = ts2,        aes(x = ts2$time,        y = ts2$strflow),        color = "orange", alpha = 1, linewidth = 1) +
+  geom_line(data = ts3,        aes(x = ts3$time,        y = ts3$strflow),        color = "green",  alpha = 1, linewidth = 1) +
+  geom_line(data = ts4,        aes(x = ts4$time,        y = ts4$strflow),        color = "blue",   alpha = 1, linewidth = 1) +
+  geom_line(data = ts5,        aes(x = ts5$time,        y = ts5$strflow),        color = "violet", alpha = 1, linewidth = 1) +
+  labs(x = "Time", y = "Q (ft3/d)") +
+  #xlim(330, 694) +    #Year 1 (2009)
+  #xlim(1425, 1790) +  #Year 2 (2012)
+  #xlim(2886, 3251) +  #Year 3 (2016)
+  #xlim(3982, 4346) +  #Year 4 (2019)
+  #xlim(5443, 5807) +  #Year 5 (2023)
+  #xlim(471, 571) +    #Year 1 Potential Recession Limb
+  #xlim(1600, 1700) +  #Year 2 Potential Recession Limb
+  #xlim(3057, 3157) +  #Year 3 Potential Recession Limb
+  #xlim(4193, 4293) +  #Year 4 Potential Recession Limb
+  #xlim(5692, 5792) +  #Year 5 Potential Recession Limb
+  #ylim(0,100) +
+  theme_classic()
+  
+################################################################################
+peak_1 <- c(471:571)
+peak_2 <- c(1600:1700)
+peak_3 <- c(3057:3157)
+peak_4 <- c(4193:4293)
+peak_5 <- c(5692:5792)
+
+################################################################################
+peak_1_data <- as.data.frame(strflow_ts[peak_1,])
+peak_1_data$idx <- seq_len(nrow(peak_1_data))
+ggplot(peak_1_data, aes(x = idx, y = strflow)) +
+  geom_line() +
+  labs(x = "Index", y = "Q (ft3/d)", title = "Peak 1 (2009)") +
+  theme_classic()
+
+peak_2_data <- as.data.frame(strflow_ts[peak_2,])
+peak_2_data$idx <- seq_len(nrow(peak_2_data))
+ggplot(peak_2_data, aes(x = idx, y = strflow)) +
+  geom_line() +
+  labs(x = "Index", y = "Q (ft3/d)", title = "Peak 2 (2012)") +
+  theme_classic()
+
+peak_3_data <- as.data.frame(strflow_ts[peak_3,])
+peak_3_data$idx <- seq_len(nrow(peak_3_data))
+ggplot(peak_3_data, aes(x = idx, y = strflow)) +
+  geom_line() +
+  labs(x = "Index", y = "Q (ft3/d)", title = "Peak 3 (2016)") +
+  theme_classic()
+
+peak_4_data <- as.data.frame(strflow_ts[peak_4,])
+peak_4_data$idx <- seq_len(nrow(peak_4_data))
+ggplot(peak_4_data, aes(x = idx, y = strflow)) +
+  geom_line() +
+  labs(x = "Index", y = "Q (ft3/d)", title = "Peak 4 (2019)") +
+  theme_classic()
+
+peak_5_data <- as.data.frame(strflow_ts[peak_5,])
+peak_5_data$idx <- seq_len(nrow(peak_5_data))
+ggplot(peak_5_data, aes(x = idx, y = strflow)) +
+  geom_line() +
+  labs(x = "Index", y = "Q (ft3/d)", title = "Peak 5 (2023)") +
+  theme_classic()
+  
+################################################################################
+peak_1_recesion <- c(1:101)
+peak_2_recesion <- c(1:101)
+peak_3_recesion <- c(1:101)
+peak_4_recesion <- c(1:101)
+peak_5_recesion <- c(1:101)
+
+# Normal scale
+plot(peak_1_data$strflow[peak_1_recesion]~peak_1_data$time[peak_1_recesion], type = "l")
+plot(peak_2_data$strflow[peak_2_recesion]~peak_2_data$time[peak_2_recesion], type = "l")
+plot(peak_3_data$strflow[peak_3_recesion]~peak_3_data$time[peak_3_recesion], type = "l")
+plot(peak_4_data$strflow[peak_4_recesion]~peak_4_data$time[peak_4_recesion], type = "l")
+plot(peak_5_data$strflow[peak_5_recesion]~peak_5_data$time[peak_5_recesion], type = "l")
+
+# Logarithm scale
+plot(log(peak_1_data$strflow[peak_1_recesion])~peak_1_data$time[peak_1_recesion], type = "l")
+plot(log(peak_2_data$strflow[peak_2_recesion])~peak_2_data$time[peak_2_recesion], type = "l")
+plot(log(peak_3_data$strflow[peak_3_recesion])~peak_3_data$time[peak_3_recesion], type = "l")
+plot(log(peak_4_data$strflow[peak_4_recesion])~peak_4_data$time[peak_4_recesion], type = "l")
+plot(log(peak_5_data$strflow[peak_5_recesion])~peak_5_data$time[peak_5_recesion], type = "l")
+
+################################################################################
+reg_pk1     <- lm(log(peak_1_data$strflow[peak_1_recesion])~ seq(1, length(peak_1_data$time[peak_1_recesion]), 1))
+sum_reg_pk1 <- summary(reg_pk1)
+rec_const_pk1 <- sum_reg_pk1$coefficients[2,1]
+adj_r2_pk1    <- sum_reg_pk1$adj.r.squared
+alpha_value1  <- 2.71828182846^(rec_const_pk1)
+
+reg_pk2     <- lm(log(peak_2_data$strflow[peak_2_recesion])~ seq(1, length(peak_2_data$time[peak_2_recesion]), 1))
+sum_reg_pk2 <- summary(reg_pk2)
+rec_const_pk2 <- sum_reg_pk2$coefficients[2,1]
+adj_r2_pk2    <- sum_reg_pk2$adj.r.squared
+alpha_value2  <- 2.71828182846^(rec_const_pk2)
+
+reg_pk3     <- lm(log(peak_3_data$strflow[peak_3_recesion])~ seq(1, length(peak_3_data$time[peak_3_recesion]), 1))
+sum_reg_pk3 <- summary(reg_pk3)
+rec_const_pk3 <- sum_reg_pk3$coefficients[2,1]
+adj_r2_pk3    <- sum_reg_pk3$adj.r.squared
+alpha_value3  <- 2.71828182846^(rec_const_pk3)
+
+reg_pk4     <- lm(log(peak_4_data$strflow[peak_4_recesion])~ seq(1, length(peak_4_data$time[peak_4_recesion]), 1))
+sum_reg_pk4 <- summary(reg_pk4)
+rec_const_pk4 <- sum_reg_pk4$coefficients[2,1]
+adj_r2_pk4    <- sum_reg_pk4$adj.r.squared
+alpha_value4  <- 2.71828182846^(rec_const_pk4)
+
+reg_pk5     <- lm(log(peak_5_data$strflow[peak_5_recesion])~ seq(1, length(peak_5_data$time[peak_5_recesion]), 1))
+sum_reg_pk5 <- summary(reg_pk5)
+rec_const_pk5 <- sum_reg_pk5$coefficients[2,1]
+adj_r2_pk5    <- sum_reg_pk5$adj.r.squared
+alpha_value5  <- 2.71828182846^(rec_const_pk5)
+
+################################################################################
+dfa <- list(alpha_value1, alpha_value2, alpha_value3, alpha_value4, alpha_value5)
+strflow_ts = strflow_ts[, -2]
+
+rm(list = setdiff(ls(), c("ts", "dfa", "ts_int")))
+################################################################################
+strflow = as.data.frame(ts_int)
+strflow = strflow[c(2,5)]
+strflow = na.omit(strflow)
+
+ts_int$strflow = signal::interp1(strflow$time, strflow$strflow, ts_int$time, "pchip", extrap = NA)
+ts_int$strflow <- ifelse(ts_int$strflow < 0, 0, ts_int$strflow)
+
+SC = as.data.frame(ts_int)
+SC = SC[c(3,5)]
+SC = na.omit(SC)
+
+ts_int$SC = signal::interp1(SC$time, SC$SC, ts_int$time, "pchip", extrap = NA)
+ts_int$SC <- ifelse(ts_int$SC < 0, 0, ts_int$SC)
+
+################################################################################
+rm(list = setdiff(ls(), c("ts", "dfa", "ts_int")))
