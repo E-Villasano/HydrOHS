@@ -1,0 +1,279 @@
+pacman::p_load(pracma, ecr, KernSmooth, tictoc, SparseM, topsis, plotly, reshape2, cdata, tidyverse, mco, nsga2R, gsignal, spacetime, zoo, xts, SparseM, fANCOVA, signal, foreach, doParallel, grwat, adc, hydroGOF, parallel, doParallel, hydrostats, hydroEvents, tidyr, spatialEco, zoo, npreg, fANCOVA, forecast, FlowScreen, stinepack, imputeTS, missForest, Metrics, dplyr, tstools, tsbox, highfrequency,ineq, tidyverse, install = T)
+library(dplyr)
+library(plotly)
+library(lubridate)
+library(zoo)
+library(ggplot2)
+library(gridExtra)
+library(bestNormalize)
+library(WH)
+library(xts)
+library(plotly)
+library(ineq)
+
+# -------- 1) Your single-candidate objective (unchanged logic, with guards) ----
+obj_one <- function(x) {
+  penalty <- 1e12
+  x <- as.numeric(x)
+
+  ################################################################################
+  SC_rain = as.data.frame(ts_int)
+  SC_rain = SC_rain[c(4,5)]
+  SC_rain = na.omit(SC_rain)
+  
+  if (round(x[1], digits = 0) == 1) {
+    ts_int$SC_rain = signal::interp1(SC_rain$time, SC_rain$SC_rain, ts_int$time, "pchip", extrap = NA)
+  } else if (round(x[1], digits = 0) == 2) {  
+    ts_int$SC_rain = signal::interp1(SC_rain$time, SC_rain$SC_rain, ts_int$time, "linear", extrap = NA)
+  } else if (round(x[1], digits = 0) == 3) { 
+    ts_int$SC_rain = signal::interp1(SC_rain$time, SC_rain$SC_rain, ts_int$time, "spline", extrap = NA)
+  } else { 
+    ts_int$SC_rain = signal::interp1(SC_rain$time, SC_rain$SC_rain, ts_int$time, "cubic", extrap = NA)
+  } 
+
+  ts_int <- ts_int[!is.na(ts_int$strflow), ]
+  
+  ################################################################################
+  dfl = as.data.frame(ts_int)
+  x2 = x[2]
+  x3 = x[3]
+
+  b <- rep(NaN, length(dfl$strflow))
+  
+  b[1] <- dfl$strflow[1]*x3*0.9
+  
+  for (i in 2:length(dfl$strflow)){
+    b[i] <- (((1-x3)*x2*b[i-1]) + ((1-x2)*x3*dfl$strflow[i]))/(1-x2*x3)
+    
+    if (is.na(b[i]))    b[i] <- dfl$strflow[i]  
+    if (b[i]<0|is.na(b[i]))    b[i] <- dfl$strflow[i]*x3*0.9  
+    if (b[i]>dfl$strflow[i]) b[i] <- dfl$strflow[i]
+  }
+  
+  dfl$b = b
+  dfl$y = dfl$strflow - b
+  dfl$bfi <- ifelse(dfl$strflow == 0, -1, dfl$b/dfl$strflow)  
+  dfl$bfi <- round(dfl$bfi, digits = 6)   
+
+  ################################################################################
+  ts_int = na.omit(ts_int) 
+  dfl = na.omit(dfl)
+  dfl <- dfl[, -1]
+
+  ss = try(smooth.spline(index(ts_int), ts_int$SC_rain*x[5], spar = x[4]), silent = TRUE)
+  if ((x[4]) == 0) {
+    ts_int$SCy = ts_int$SC_rain*x[5]+x[6]
+  } else {
+    ts_int$SCy = ss$y+x[6]
+  }
+
+  ts <- xts(ts_int[, -1], order.by = ts_int$datetime)
+  ################################################################################
+  lag = round(x[7], digits = 0)
+  SCy_lag = (stats::lag(ts$SCy,-lag))
+  
+  dfl$SCy = SCy_lag
+  colnames(dfl)[8] <- "SCy"
+  dfl = na.omit(dfl)
+  
+  ################################################################################
+  dfl_filt = dfl[dfl$bfi > -1, ]
+  
+  rownames(dfl_filt) <- 1:nrow(dfl_filt)
+  dfl_filt$time = 1:nrow(dfl_filt)
+  
+  ################################################################################
+  ph = round(x[8], digits = 6)
+  pl = round(x[9], digits = 6)
+  
+  peaks_bfi <- pracma::findpeaks(dfl_filt$bfi, minpeakheight = ph, minpeakdistance = pl)
+  ps <- if (!is.null(peaks_bfi)) as.data.frame(peaks_bfi)$V2 else numeric(0)
+  if (length(ps) > 1) ps <- sort(ps)
+  
+  dflp <- if (length(ps) > 0) dfl_filt[ps, ] else dfl_filt[0, ]
+  
+  ################################################################################
+  if (nrow(dflp)>3)  {
+    SCb = as.data.frame(((dflp$SC*dflp$strflow)-(dflp$SCy*dflp$y))/
+                          dflp$b)
+    SCb$i = dflp$time
+  } else {
+    dflp = dfl[1:3,]
+    SCb = dfl[1:3,cbind(2, 4)]
+  }
+  
+  colnames(SCb) <- c('SCb', 'i')
+
+  SCb$SCb <- ifelse(SCb$SCb <0, 0, SCb$SCb)
+  dflp$SCb=SCb$SCb
+  
+  ################################################################################
+  if (round(x[10], digits = 0) == 1) {
+    dfl_filt$SCb = signal::interp1(SCb$i, SCb$SCb, dfl_filt$time, "pchip", extrap = NA)
+  } else if (round(x[10], digits = 0) == 2) {  
+    dfl_filt$SCb = signal::interp1(SCb$i, SCb$SCb, dfl_filt$time, "linear", extrap = NA)
+  } else if (round(x[10], digits = 0) == 3) { 
+    dfl_filt$SCb = signal::interp1(SCb$i, SCb$SCb, dfl_filt$time, "spline", extrap = NA)
+  } else { 
+    dfl_filt$SCb = signal::interp1(SCb$i, SCb$SCb, dfl_filt$time, "cubic", extrap = NA)
+  } 
+ 
+  dfl_filt = na.omit(dfl_filt)
+  
+  ################################################################################
+  dfl_filt$SCq = as.numeric((dfl_filt$SCb * dfl_filt$b + dfl_filt$SCy * dfl_filt$y)/dfl_filt$strflow)
+  dfl_filt <- dfl_filt[!is.na(dfl_filt$SCb), ]
+  
+  ################################################################################
+  cali = dfl_filt[!(dfl_filt$time %in% dflp$time), ]
+
+  ################################################################################
+  cali$ind1 = ifelse(cali$SC>cali$SCb,1,0)
+  cali$ind2 = ifelse(cali$SC<cali$SCb,1,0)
+  cali$ind3 = ifelse(cali$SCy>cali$SC,1,0)
+  cali$ind4 = ifelse(cali$SCy<cali$SC,1,0)
+  
+  ################################################################################
+  resid <- cali$SC - cali$SCq
+  pen <- ineq(abs(resid), type = "Gini")
+  
+  ################################################################################
+  f <- numeric(4) 
+  if (x[3] ==0 || x[3] ==1 || min(ts_int$SC_rain) <=0 || min(ts_int$SCy) <=0 || min(dfl_filt$SCb) <=0) {
+    f1 = 1e12  
+    f2 = 1e12
+    f3 = 1e12
+    f4 = 1e12
+  } else {
+    f1 = try(Metrics::mae(cali$SC, cali$SCq)*(1+pen), silent = TRUE)
+    f2 = as.numeric(sum(cali$ind1) - sum(cali$ind2))  # SC > SCb vs SC < SCb
+    f3 = as.numeric(sum(cali$ind3) - sum(cali$ind4))  # SCy > SC vs SCy < SC
+    f4 = abs(dflp$bfi[which.max(dflp$bfi)]-dflp$bfi[which.max(dflp$SCb)])-1
+  }
+  
+  return(c(f1, f2, f3, f4))
+}
+
+obj <- function(x) {
+  penalty <- 1e12
+  safe_one <- function(v) {
+    out <- try(obj_one(v), silent=TRUE)
+    if (inherits(out,"try-error") || !is.numeric(out) || length(out) != 4L) out <- rep(penalty,4)
+    out[!is.finite(out)] <- penalty
+    as.numeric(out)
+  }
+  if (is.null(dim(x))) {
+    safe_one(x)
+  } else {
+    k <- nrow(x)
+    ans <- t(vapply(seq_len(k), function(i) safe_one(x[i, , drop=FALSE]), numeric(4)))
+    ans[!is.finite(ans)] <- penalty
+    dim(ans) <- c(k, 4) 
+    ans
+  }
+}
+
+lower <- c(1, 0.975, 0, 0, 0, -100, -200, 0, 1, 1)
+upper <- c(2, 0.996, 1, 1, 10, 100, 200, 1, 100, 2)
+d <- length(lower)
+mu <- 1000L     
+lambda <- 1000L    
+
+printer <- makeTerminator(
+  condition.fun = function(log) {
+    it <- nrow(getStatistics(log)) - 1L
+    message(sprintf("NSGA-II iteration: %d", it))
+    FALSE
+  },
+  name = "printer",
+  message = "progress"
+)
+
+tic()
+set.seed(1970)
+res_1 <- ecr::nsga2(
+  fitness.fun   = obj,
+  n.objectives  = 4L,
+  n.dim         = d,
+  minimize      = rep(TRUE, 4),
+  lower         = lower, upper = upper,
+  mu            = mu, lambda = lambda,
+  terminators = list(printer, stopOnIters(100L)),   
+)
+
+toc()
+
+seed <- res_1$pareto.set          
+#saveRDS(seed, "seed_nsga2_chunk1.rds")
+#saveRDS(res_1, "res_1_nsga2_chunk1.rds")
+
+str(res_1$pareto.front)  
+length(res_1$pareto.set) 
+
+###############################################################################
+###############################################################################
+topsis <- function(Y, weights = NULL, benefit = NULL) {
+  Y <- as.matrix(Y)
+  stopifnot(nrow(Y) > 0, ncol(Y) > 0)
+  m <- ncol(Y)
+  
+  if (is.null(weights)) weights <- rep(1/m, m)
+  weights <- weights / sum(weights)
+  
+  if (is.null(benefit)) benefit <- rep(FALSE, m)
+  stopifnot(length(weights) == m, length(benefit) == m)
+  
+  denom <- sqrt(colSums(Y^2))
+  denom[denom == 0] <- 1
+  Z  <- sweep(Y, 2, denom, "/")
+  WZ <- sweep(Z,  2, weights, "*")
+  
+  ideal_best  <- sapply(seq_len(m), function(j) if (benefit[j]) max(WZ[,j]) else min(WZ[,j]))
+  ideal_worst <- sapply(seq_len(m), function(j) if (benefit[j]) min(WZ[,j]) else max(WZ[,j]))
+  
+  d_pos <- sqrt(rowSums((sweep(WZ, 2, ideal_best,  "-"))^2))
+  d_neg <- sqrt(rowSums((sweep(WZ, 2, ideal_worst, "-"))^2))
+  Cstar <- d_neg / pmax(d_pos + d_neg, .Machine$double.eps)
+  
+  list(
+    score       = Cstar,
+    rank        = rank(-Cstar, ties.method = "min"),
+    best_id     = which.max(Cstar),
+    ideal_best  = ideal_best,
+    ideal_worst = ideal_worst
+  )
+}
+
+################################################################################
+Y <- res_1$pareto.front
+S <- res_1$pareto.set
+
+w       <- c(1, 0.5, 0.5, 1)
+benefit <- c(FALSE, FALSE, FALSE, FALSE)
+
+tp <- topsis(Y, weights = w, benefit = benefit)
+
+best_idx   <- tp$best_id
+best_score <- tp$score[best_idx]
+x_star     <- S[[best_idx]]
+
+cat("TOPSIS picked solution", best_idx, "with C* =", round(best_score, 4), "\n")
+print(x_star)
+
+top_k <- order(-tp$score)[1:min(5, length(tp$score))]
+Fs <- data.frame(
+  id    = top_k,
+  Cstar = round(tp$score[top_k], 6),
+  Y[top_k, , drop = FALSE]
+)
+Fs <- Fs[1, ]
+
+library(plotly)
+fig <- plot_ly(data = Y, x = ~y1, y = ~y2, z = ~y4, type = "scatter3d", mode = "markers", name = "Pareto Front", marker = list(size = 2)) %>%
+  add_trace(data = Fs, x = ~y1, y = ~y2, z = ~y4, type = "scatter3d", mode = "markers", name = "Optimum", marker = list(size = 5))
+fig
+
+write.csv(as.data.frame(x_star), "out_1, 0.5, 0.5, 1.csv")
+write.csv(as.data.frame(Y),      "Y_1, 0.5, 0.5, 1.csv")
+saveRDS(S,  "pareto_set_1, 0.5, 0.5, 1.rds")
+write.csv(as.data.frame(Fs),     "Fs_1, 0.5, 0.5, 1.csv")
