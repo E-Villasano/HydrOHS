@@ -21,11 +21,11 @@ obj_one <- function(x) {
   SC_rain = SC_rain[c(4,5)]
   SC_rain = na.omit(SC_rain)
   
-  if (round(x[3], digits = 0) == 1) {
+  if (round(x[1], digits = 0) == 1) {
     ts_int$SC_rain = signal::interp1(SC_rain$time, SC_rain$SC_rain, ts_int$time, "pchip", extrap = NA)
-  } else if (round(x[3], digits = 0) == 2) {  
+  } else if (round(x[1], digits = 0) == 2) {  
     ts_int$SC_rain = signal::interp1(SC_rain$time, SC_rain$SC_rain, ts_int$time, "linear", extrap = NA)
-  } else if (round(x[3], digits = 0) == 3) { 
+  } else if (round(x[1], digits = 0) == 3) { 
     ts_int$SC_rain = signal::interp1(SC_rain$time, SC_rain$SC_rain, ts_int$time, "spline", extrap = NA)
   } else { 
     ts_int$SC_rain = signal::interp1(SC_rain$time, SC_rain$SC_rain, ts_int$time, "cubic", extrap = NA)
@@ -34,30 +34,25 @@ obj_one <- function(x) {
   ts_int <- ts_int[!is.na(ts_int$strflow), ]
   
   ################################################################################
-  # Create dfl
   dfl = as.data.frame(ts_int)
-  
-  x1 = x[1]
   x2 = x[2]
+  x3 = x[3]
 
   b <- rep(NaN, length(dfl$strflow))
   
-  b[1] <- dfl$strflow[1]*x2*0.9
+  b[1] <- dfl$strflow[1]*x3*0.9
   
   for (i in 2:length(dfl$strflow)){
-    b[i] <- (((1-x2)*x1*b[i-1]) + ((1-x1)*x2*dfl$strflow[i]))/(1-x1*x2) 
+    b[i] <- (((1-x3)*x2*b[i-1]) + ((1-x2)*x3*dfl$strflow[i]))/(1-x2*x3)
     
     if (is.na(b[i]))    b[i] <- dfl$strflow[i]  
-    if (b[i]<0|is.na(b[i]))    b[i] <- dfl$strflow[i]*x2*0.9  
+    if (b[i]<0|is.na(b[i]))    b[i] <- dfl$strflow[i]*x3*0.9  
     if (b[i]>dfl$strflow[i]) b[i] <- dfl$strflow[i]
   }
   
   dfl$b = b
-
   dfl$y = dfl$strflow - b
-
   dfl$bfi <- ifelse(dfl$strflow == 0, -1, dfl$b/dfl$strflow)  
-
   dfl$bfi <- round(dfl$bfi, digits = 6)   
 
   ################################################################################
@@ -67,7 +62,7 @@ obj_one <- function(x) {
 
   ss = try(smooth.spline(index(ts_int), ts_int$SC_rain*x[5], spar = x[4]), silent = TRUE)
   if ((x[4]) == 0) {
-    ts_int$SCy = ts_int$SC_rain+x[6]
+    ts_int$SCy = ts_int$SC_rain*x[5]+x[6]
   } else {
     ts_int$SCy = ss$y+x[6]
   }
@@ -144,22 +139,20 @@ obj_one <- function(x) {
   
   ################################################################################
   f <- numeric(4) 
-  if (x[2] ==0 || x[2] ==1 || min(ts_int$SC_rain) <=0 || min(ts_int$SCy) <=0 || min(dfl_filt$SCb) <=0 ||(x[11]- dflp$bfi[which.max(dflp$SCb)]) > 0) {
-    f1 = 1e12 
+  if (x[3] ==0 || x[3] ==1 || min(ts_int$SC_rain) <=0 || min(ts_int$SCy) <=0 || min(dfl_filt$SCb) <=0) {
+    f1 = 1e12  
     f2 = 1e12
     f3 = 1e12
     f4 = 1e12
   } else {
-
     f1 = try(Metrics::mae(cali$SC, cali$SCq)*(1+pen), silent = TRUE)
-    f2 = as.numeric(sum(cali$ind1) - sum(cali$ind2))  
-    f3 = as.numeric(sum(cali$ind3) - sum(cali$ind4))  
-    f4 = 1-x[11]
+    f2 = as.numeric(sum(cali$ind1) - sum(cali$ind2))  # SC > SCb vs SC < SCb
+    f3 = as.numeric(sum(cali$ind3) - sum(cali$ind4))  # SCy > SC vs SCy < SC
+    f4 = abs(dflp$bfi[which.max(dflp$bfi)]-dflp$bfi[which.max(dflp$SCb)])-1
   }
   
   return(c(f1, f2, f3, f4))
 }
-
 
 obj <- function(x) {
   penalty <- 1e12
@@ -175,28 +168,26 @@ obj <- function(x) {
     k <- nrow(x)
     ans <- t(vapply(seq_len(k), function(i) safe_one(x[i, , drop=FALSE]), numeric(4)))
     ans[!is.finite(ans)] <- penalty
-    dim(ans) <- c(k, 4)   
+    dim(ans) <- c(k, 4) 
     ans
   }
 }
 
-
-lower <- c(0.9996, 0, 1, 0, 0, -100, -19200, 0, 96, 1, 0)
-upper <- c(0.9999, 1, 2, 1, 10, 100, 19200, 1, 9600, 2, 1)
+lower <- c(1, 0.9997, 0, 0, 0, -100, -19200, 0, 96, 1)
+upper <- c(2, 0.9999, 1, 1, 10, 100, 19200, 1, 9600, 2)
 d <- length(lower)
-mu <- 1000L            
-lambda <- 1000L        
+mu <- 1000L     
+lambda <- 1000L    
 
 printer <- makeTerminator(
   condition.fun = function(log) {
     it <- nrow(getStatistics(log)) - 1L
     message(sprintf("NSGA-II iteration: %d", it))
-    FALSE  
+    FALSE
   },
   name = "printer",
   message = "progress"
 )
-
 
 tic()
 set.seed(1970)
@@ -229,37 +220,36 @@ topsis <- function(Y, weights = NULL, benefit = NULL) {
   if (is.null(weights)) weights <- rep(1/m, m)
   weights <- weights / sum(weights)
   
-  if (is.null(benefit)) benefit <- rep(FALSE, m)  
+  if (is.null(benefit)) benefit <- rep(FALSE, m)
   stopifnot(length(weights) == m, length(benefit) == m)
   
   denom <- sqrt(colSums(Y^2))
   denom[denom == 0] <- 1
-  Z <- sweep(Y, 2, denom, "/")
+  Z  <- sweep(Y, 2, denom, "/")
+  WZ <- sweep(Z,  2, weights, "*")
   
-  WZ <- sweep(Z, 2, weights, "*")
+  ideal_best  <- sapply(seq_len(m), function(j) if (benefit[j]) max(WZ[,j]) else min(WZ[,j]))
+  ideal_worst <- sapply(seq_len(m), function(j) if (benefit[j]) min(WZ[,j]) else max(WZ[,j]))
   
-  ideal_best  <- sapply(seq_len(m), function(j) if (benefit[j]) max(WZ[, j]) else min(WZ[, j]))
-  ideal_worst <- sapply(seq_len(m), function(j) if (benefit[j]) min(WZ[, j]) else max(WZ[, j]))
-  
-  d_pos <- sqrt(rowSums((sweep(WZ, 2, ideal_best , "-"))^2))
+  d_pos <- sqrt(rowSums((sweep(WZ, 2, ideal_best,  "-"))^2))
   d_neg <- sqrt(rowSums((sweep(WZ, 2, ideal_worst, "-"))^2))
   Cstar <- d_neg / pmax(d_pos + d_neg, .Machine$double.eps)
   
   list(
-    score   = Cstar,
-    rank    = rank(-Cstar, ties.method = "min"),
-    best_id = which.max(Cstar),
-    ideal_best = ideal_best,
+    score       = Cstar,
+    rank        = rank(-Cstar, ties.method = "min"),
+    best_id     = which.max(Cstar),
+    ideal_best  = ideal_best,
     ideal_worst = ideal_worst
   )
 }
 
 ################################################################################
-Y <- res_1$pareto.front          
-S <- res_1$pareto.set            
+Y <- res_1$pareto.front
+S <- res_1$pareto.set
 
-w <- c(1, 0.5, 0.5, 1)             
-benefit <- c(FALSE, FALSE, FALSE, FALSE)  
+w       <- c(1, 0.5, 0.5, 1)
+benefit <- c(FALSE, FALSE, FALSE, FALSE)
 
 tp <- topsis(Y, weights = w, benefit = benefit)
 
@@ -271,21 +261,19 @@ cat("TOPSIS picked solution", best_idx, "with C* =", round(best_score, 4), "\n")
 print(x_star)
 
 top_k <- order(-tp$score)[1:min(5, length(tp$score))]
-Fs = data.frame(
+Fs <- data.frame(
   id    = top_k,
   Cstar = round(tp$score[top_k], 6),
   Y[top_k, , drop = FALSE]
 )
-Fs = Fs[1,]
-
+Fs <- Fs[1, ]
 
 library(plotly)
 fig <- plot_ly(data = Y, x = ~y1, y = ~y2, z = ~y4, type = "scatter3d", mode = "markers", name = "Pareto Front", marker = list(size = 2)) %>%
   add_trace(data = Fs, x = ~y1, y = ~y2, z = ~y4, type = "scatter3d", mode = "markers", name = "Optimum", marker = list(size = 5))
 fig
 
-
-write.csv(as.data.frame(x_star),"out_test.csv")
-write.csv(as.data.frame(Y),"Y_test.csv")
-saveRDS(S, "pareto_set.rds")
-write.csv(as.data.frame(Fs),"Fs.csv")
+write.csv(as.data.frame(x_star), "out_1, 0.5, 0.5, 1.csv")
+write.csv(as.data.frame(Y),      "Y_1, 0.5, 0.5, 1.csv")
+saveRDS(S,  "pareto_set_1, 0.5, 0.5, 1.rds")
+write.csv(as.data.frame(Fs),     "Fs_1, 0.5, 0.5, 1.csv")
