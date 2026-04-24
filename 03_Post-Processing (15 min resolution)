@@ -1,6 +1,5 @@
-pacman::p_load(pracma, ecr, KernSmooth, tictoc, SparseM, topsis, plotly, reshape2, cdata, tidyverse, mco, nsga2R, gsignal, spacetime, zoo, xts, SparseM, fANCOVA, signal, foreach, doParallel, grwat, adc, hydroGOF, parallel, doParallel, hydrostats, hydroEvents, tidyr, spatialEco, zoo, npreg, fANCOVA, forecast, FlowScreen, stinepack, imputeTS, missForest, Metrics, dplyr, tstools, tsbox, highfrequency,ineq, tidyverse, install = T)
+pacman::p_load(pracma, ecr, KernSmooth, tictoc, SparseM, topsis, reshape2, cdata, tidyverse, mco, nsga2R, gsignal, spacetime, zoo, xts, SparseM, fANCOVA, signal, foreach, doParallel, grwat, adc, hydroGOF, parallel, doParallel, hydrostats, hydroEvents, tidyr, spatialEco, zoo, npreg, fANCOVA, forecast, FlowScreen, stinepack, imputeTS, missForest, Metrics, dplyr, tstools, tsbox, highfrequency, ineq, tidyverse, install = T)
 library(dplyr)
-library(plotly)
 library(lubridate)
 library(zoo)
 library(ggplot2)
@@ -8,9 +7,14 @@ library(gridExtra)
 library(bestNormalize)
 library(WH)
 library(xts)
-library(plotly)
 library(ineq)
+library(tidyr)
+library(Metrics)
 
+mutate    <- dplyr::mutate
+filter    <- dplyr::filter
+select    <- dplyr::select
+summarise <- dplyr::summarise
 
 x1	=	
 x2	=	
@@ -22,18 +26,17 @@ x7	=
 x8	=	
 x9	=	
 x10	=	
-x11	=	
 
 ################################################################################
 SC_rain = as.data.frame(ts_int)
 SC_rain = SC_rain[c(4,5)]
 SC_rain = na.omit(SC_rain)
 
-if (round(x3, digits = 0) == 1) {
+if (round(x1, digits = 0) == 1) {
   ts_int$SC_rain = signal::interp1(SC_rain$time, SC_rain$SC_rain, ts_int$time, "pchip", extrap = NA)
-} else if (round(x3, digits = 0) == 2) {  
+} else if (round(x1, digits = 0) == 2) {  
   ts_int$SC_rain = signal::interp1(SC_rain$time, SC_rain$SC_rain, ts_int$time, "linear", extrap = NA)
-} else if (round(x3, digits = 0) == 3) { 
+} else if (round(x1, digits = 0) == 3) { 
   ts_int$SC_rain = signal::interp1(SC_rain$time, SC_rain$SC_rain, ts_int$time, "spline", extrap = NA)
 } else { 
   ts_int$SC_rain = signal::interp1(SC_rain$time, SC_rain$SC_rain, ts_int$time, "cubic", extrap = NA)
@@ -44,28 +47,20 @@ ts_int <- ts_int[!is.na(ts_int$strflow), ]
 ################################################################################
 dfl = as.data.frame(ts_int)
 
-x1 = x1
-x2 = x2
-
 b <- rep(NaN, length(dfl$strflow))
-
-b[1] <- dfl$strflow[1]*x2*0.9  
+b[1] <- dfl$strflow[1]*x3*0.9
 
 for (i in 2:length(dfl$strflow)){
-  b[i] <- (((1-x2)*x1*b[i-1]) + ((1-x1)*x2*dfl$strflow[i]))/(1-x1*x2)
-  
-  if (is.na(b[i]))    b[i] <- dfl$strflow[i]  
-  if (b[i]<0|is.na(b[i]))    b[i] <- dfl$strflow[i]*x2*0.9 
-  if (b[i]>dfl$strflow[i]) b[i] <- dfl$strflow[i]
+  b[i] <- (((1-x3)*x2*b[i-1]) + ((1-x2)*x3*dfl$strflow[i]))/(1-x2*x3)
+  if (is.na(b[i]))              b[i] <- dfl$strflow[i]
+  if (b[i]<0|is.na(b[i]))      b[i] <- dfl$strflow[i]*x3*0.9
+  if (b[i]>dfl$strflow[i])     b[i] <- dfl$strflow[i]
 }
 
-dfl$b = b
-
-dfl$y = dfl$strflow - b
-
-dfl$bfi <- ifelse(dfl$strflow == 0, -1, dfl$b/dfl$strflow)  
-
-dfl$bfi <- round(dfl$bfi, digits = 6)   
+dfl$b   = b
+dfl$y   = dfl$strflow - b
+dfl$bfi = ifelse(dfl$strflow == 0, -1, dfl$b/dfl$strflow)
+dfl$bfi = round(dfl$bfi, digits = 6) 
 
 ################################################################################
 ts_int = na.omit(ts_int) 
@@ -84,9 +79,9 @@ ts <- xts(ts_int[, -1], order.by = ts_int$datetime)
 lag = round(x7, digits = 0)
 SCy_lag = (stats::lag(ts$SCy,-lag))
 
-dfl$SCy = SCy_lag
-colnames(dfl)[9] <- "SCy"
-
+SCy_df  <- data.frame(datetime = index(SCy_lag), SCy = as.numeric(SCy_lag))
+dfl     <- merge(dfl, SCy_df, by = "datetime", all.x = TRUE)
+colnames(dfl)[ncol(dfl)] <- "SCy"
 dfl = na.omit(dfl)
 
 ################################################################################
@@ -117,9 +112,8 @@ if (nrow(dflp)>3)  {
 }
 
 colnames(SCb) <- c('SCb', 'i')
-
-SCb$SCb <- ifelse(SCb$SCb <0, 0, SCb$SCb)
-dflp$SCb=SCb$SCb
+SCb$SCb  <- ifelse(SCb$SCb < 0, 0, SCb$SCb)
+dflp$SCb = SCb$SCb
 
 ################################################################################
 if (round(x10, digits = 0) == 1) {
@@ -153,21 +147,22 @@ pen <- ineq(abs(resid), type = "Gini")
 
 ################################################################################
 f <- numeric(4) 
-if (x2 ==0 || x2 ==1 || min(ts_int$SC_rain) <=0 || min(ts_int$SCy) <=0 || min(dfl_filt$SCb) <=0 ||(x11 - dflp$bfi[which.max(dflp$SCb)]) > 0) {
-  f1 = 1e12 
+if (x3 == 0 || x3 == 1 || min(ts_int$SC_rain) <= 0 || min(ts_int$SCy) <= 0 ||
+    min(dfl_filt$SCb) <= 0) {
+  f1 = 1e12
   f2 = 1e12
   f3 = 1e12
   f4 = 1e12
 } else {
-
   f1 = try(Metrics::mae(cali$SC, cali$SCq)*(1+pen), silent = TRUE)
-  f2 = as.numeric(sum(cali$ind1) - sum(cali$ind2)) 
-  f3 = as.numeric(sum(cali$ind3) - sum(cali$ind4))  
-  f4 = 1-x11
-  
+  f2 = as.numeric(sum(cali$ind1) - sum(cali$ind2))
+  f3 = as.numeric(sum(cali$ind3) - sum(cali$ind4))
+  f4 = 1 - (abs(dflp$bfi[which.max(dflp$bfi)]-dflp$bfi[which.max(dflp$SCb)]))
 }
 
-write.csv(as.data.frame(dfl),"dfl.csv")
+max(dflp$bfi)
+dflp$bfi[which.max(dflp$SCb)]
+write.csv(as.data.frame(dfl), "dfl.csv")
 
 ################################################################################
 ## Plots
