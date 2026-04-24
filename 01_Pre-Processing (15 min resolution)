@@ -10,6 +10,11 @@ library(imputeTS)
 library(fANCOVA)
 library(xts)
 
+mutate    <- dplyr::mutate
+filter    <- dplyr::filter
+select    <- dplyr::select
+summarise <- dplyr::summarise
+
 ################################################################################
 df_SC = read.csv("df_SC.csv",header=TRUE)
 df_WL = read.csv("df_WL.csv",header=TRUE)
@@ -67,18 +72,16 @@ dfm <- list(df_dt, data_WL, data_SC)
 
 merged_df <- Reduce(function(x, y) {
   left_join(x, y, by = c("datetime", "timezone"))
-  #full_join(x, y, by = c("datetime", "timezone"))
 }, dfm)
 
-str(merged_df) #still as chr
-str(df) #read as POSIXct
+str(merged_df)
+str(df)
 str(data_SC_rain)
 
 dfr <- list(merged_df, data_SC_rain)
 
 ts <- Reduce(function(x, y) {
   left_join(x, y, by = c("datetime"))
-  #full_join(x, y, by = c("datetime"))
 }, dfr)
 
 ts = cbind(df, ts[c(3:5)])
@@ -127,9 +130,6 @@ ggplot() +
   #xlim(553629, 563328) + #Year 5 Potential Recession Limb
   #ylim(0,100) +
   theme_classic()
-
-#p0_interactive <- ggplotly(p0)
-#p0_interactive
 
 peak_1 <- c(55197:64892)    # User action: define the beggining and end of the peak (x axis) 2009 -> 2009-06-20:2009-09-28
 peak_2 <- c(159357:169052)  # User action: define the beggining and end of the peak (x axis) 2012 -> 2012-06-09:2012-09-17
