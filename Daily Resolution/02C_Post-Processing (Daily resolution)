@@ -69,7 +69,7 @@ dfl = na.omit(dfl)
 
 ss = try(smooth.spline(index(ts_int), ts_int$SC_rain*x5, spar = x4), silent = TRUE)
 if ((x4) == 0) {
-  ts_int$SCy = ts_int$SC_rain+x6
+  ts_int$SCy = ts_int$SC_rain*x5+x6
 } else {
   ts_int$SCy = ss$y+x6
 }
