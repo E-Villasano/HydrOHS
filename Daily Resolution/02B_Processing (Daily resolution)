@@ -139,7 +139,7 @@ obj_one <- function(x) {
   
   ################################################################################
   f <- numeric(4) 
-  if (x[3] ==0 || x[3] ==1 || min(ts_int$SC_rain) <=0 || min(ts_int$SCy) <=0 || min(dfl_filt$SCb) <=0) {
+  if (x[3] ==0 || x[3] ==1 || min(ts_int$SC_rain) <=0 || min(ts_int$SCy) <=0 || min(dfl_filt$SCb) <=0) || (x[11]- dflp$bfi[which.max(dflp$SCb)]) > 0) {
     f1 = 1e12  
     f2 = 1e12
     f3 = 1e12
@@ -148,7 +148,7 @@ obj_one <- function(x) {
     f1 = try(Metrics::mae(cali$SC, cali$SCq)*(1+pen), silent = TRUE)
     f2 = as.numeric(sum(cali$ind1) - sum(cali$ind2))  # SC > SCb vs SC < SCb
     f3 = as.numeric(sum(cali$ind3) - sum(cali$ind4))  # SCy > SC vs SCy < SC
-    f4 = abs(dflp$bfi[which.max(dflp$bfi)]-dflp$bfi[which.max(dflp$SCb)])-1
+    f4 = 1-x[11]
   }
   
   return(c(f1, f2, f3, f4))
@@ -173,8 +173,8 @@ obj <- function(x) {
   }
 }
 
-lower <- c(1, 0.975, 0, 0, 0, -100, -200, 0, 1, 1)
-upper <- c(2, 0.996, 1, 1, 10, 100, 200, 1, 100, 2)
+lower <- c(1, 0.975, 0, 0, 0, -100, -200, 0, 1, 1, 0)
+upper <- c(2, 0.996, 1, 1, 10, 100, 200, 1, 100, 2, 1)
 d <- length(lower)
 mu <- 1000L     
 lambda <- 1000L    
