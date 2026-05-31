@@ -26,6 +26,7 @@ x7	=
 x8	=	
 x9	=	
 x10	=	
+x11	=	
 
 ################################################################################
 SC_rain = as.data.frame(ts_int)
@@ -148,7 +149,7 @@ pen <- ineq(abs(resid), type = "Gini")
 ################################################################################
 f <- numeric(4) 
 if (x3 == 0 || x3 == 1 || min(ts_int$SC_rain) <= 0 || min(ts_int$SCy) <= 0 ||
-    min(dfl_filt$SCb) <= 0) {
+    min(dfl_filt$SCb) <= 0) ||(x11- dflp$bfi[which.max(dflp$SCb)]) > 0) {
   f1 = 1e12
   f2 = 1e12
   f3 = 1e12
@@ -157,7 +158,7 @@ if (x3 == 0 || x3 == 1 || min(ts_int$SC_rain) <= 0 || min(ts_int$SCy) <= 0 ||
   f1 = try(Metrics::mae(cali$SC, cali$SCq)*(1+pen), silent = TRUE)
   f2 = as.numeric(sum(cali$ind1) - sum(cali$ind2))
   f3 = as.numeric(sum(cali$ind3) - sum(cali$ind4))
-  f4 = 1 - (abs(dflp$bfi[which.max(dflp$bfi)]-dflp$bfi[which.max(dflp$SCb)]))
+  f4 = 1-x11
 }
 
 max(dflp$bfi)
