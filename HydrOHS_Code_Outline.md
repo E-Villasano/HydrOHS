@@ -345,7 +345,7 @@ plot results:
 Generate a 3-D Pareto plot of the algorithm run's ouptut that highlights the TOPSIS-selected optimum solution
 
 ################################################################################
-### export as csv
+### Export as csv
 
 #Save the TOPSIS solution's decision variables, corresponding objective function evaluation, & datasets used in the Pareto plot generation
 
