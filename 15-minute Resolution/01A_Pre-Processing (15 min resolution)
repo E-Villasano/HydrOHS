@@ -1,6 +1,5 @@
 pacman::p_load(pracma, ecr, KernSmooth, tictoc, SparseM, topsis, plotly, reshape2, cdata, tidyverse, mco, nsga2R, gsignal, spacetime, zoo, xts, SparseM, fANCOVA, signal, foreach, doParallel, grwat, adc, hydroGOF, parallel, doParallel, hydrostats, hydroEvents, tidyr, spatialEco, zoo, npreg, fANCOVA, forecast, FlowScreen, stinepack, imputeTS, missForest, Metrics, dplyr, tstools, tsbox, highfrequency, tidyverse, install = T)
 library(dplyr)
-library(plotly)
 library(lubridate)
 library(zoo)
 library(ggplot2)
@@ -9,6 +8,7 @@ library(scales)
 library(imputeTS)
 library(fANCOVA)
 library(xts)
+library(plotly)
 
 mutate    <- dplyr::mutate
 filter    <- dplyr::filter
@@ -157,11 +157,11 @@ peak_5_data <- as.data.frame(ts[peak_5,])
 ggplotly(ggplot(peak_5_data, aes(x = seq(1, length(time), 1)))+
            geom_line(aes(y = strflow))) 
 
-peak_1_recesion <- c(1:9696)  # # User action: define the beggining and end of the recession curve (x axis)
-peak_2_recesion <- c(1:9696)  # # User action: define the beggining and end of the recession curve (x axis)
-peak_3_recesion <- c(1:9696)  # # User action: define the beggining and end of the recession curve (x axis)
-peak_4_recesion <- c(1:9696)  # # User action: define the beggining and end of the recession curve (x axis)
-peak_5_recesion <- c(1:9700)  # # User action: define the beggining and end of the recession curve (x axis)
+peak_1_recesion <- c(1:9696)  # # User action: define the beginning and end of the recession curve (x axis)
+peak_2_recesion <- c(1:9696)  # # User action: define the beginning and end of the recession curve (x axis)
+peak_3_recesion <- c(1:9696)  # # User action: define the beginning and end of the recession curve (x axis)
+peak_4_recesion <- c(1:9696)  # # User action: define the beginning and end of the recession curve (x axis)
+peak_5_recesion <- c(1:9696)  # # User action: define the beginning and end of the recession curve (x axis)
 
 plot(peak_1_data$strflow[peak_1_recesion]~peak_1_data$time[peak_1_recesion], type = "l")
 plot(peak_2_data$strflow[peak_2_recesion]~peak_2_data$time[peak_2_recesion], type = "l")
