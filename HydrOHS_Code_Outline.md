@@ -281,8 +281,7 @@ Begin excecution of HydrOHS base function
 End of HydrOHS base function
 
 ################################################################################ 
-
-Multi- Objective Optimization Execution
+### Multi- Objective Optimization Execution
 
 Batch-safe wrapper (guarantees k×3 matrix for ecr):
 
@@ -314,7 +313,7 @@ Generate matrix of 4 objectives
 Detail the number of non-dominated solutions
 
 ###############################################################################
-TOPSIS helper
+### TOPSIS helper
   
   1) Vector normalization
   
@@ -325,7 +324,7 @@ TOPSIS helper
   4) Establish Distances & closeness
 
 ################################################################################
-Apply TOPSIS to ecr output (res1)
+### Apply TOPSIS to ecr output (res1)
 
 Generate Pareto front (objectives) and identify corresponding decision vectors
 
@@ -346,7 +345,7 @@ plot results:
 Generate a 3-D Pareto plot of the algorithm run's ouptut that highlights the TOPSIS-selected optimum solution
 
 ################################################################################
-export as csv
+### export as csv
 
 #Save the TOPSIS solution's decision variables, corresponding objective function evaluation, & datasets used in the Pareto plot generation
 
