@@ -1,6 +1,5 @@
 pacman::p_load(pracma, ecr, KernSmooth, tictoc, SparseM, topsis, plotly, reshape2, cdata, tidyverse, mco, nsga2R, gsignal, spacetime, zoo, xts, SparseM, fANCOVA, signal, foreach, doParallel, grwat, adc, hydroGOF, parallel, doParallel, hydrostats, hydroEvents, tidyr, spatialEco, zoo, npreg, fANCOVA, forecast, FlowScreen, stinepack, imputeTS, missForest, Metrics, dplyr, tstools, tsbox, highfrequency,ineq, tidyverse, install = T)
 library(dplyr)
-library(plotly)
 library(lubridate)
 library(zoo)
 library(ggplot2)
